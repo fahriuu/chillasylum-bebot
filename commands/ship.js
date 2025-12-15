@@ -24,22 +24,21 @@ function getShipMessage(percentage) {
 }
 
 function createLoveMeterImage(percentage) {
-    const canvas = createCanvas(400, 200);
+    const canvas = createCanvas(400, 180);
     const ctx = canvas.getContext("2d");
 
     // Background
     ctx.fillStyle = "#2b2d31";
-    ctx.fillRect(0, 0, 400, 200);
+    ctx.fillRect(0, 0, 400, 180);
 
-    // Draw meter arc background
     const centerX = 200;
-    const centerY = 150;
-    const radius = 100;
+    const centerY = 130;
+    const radius = 90;
 
     // Background arc (grey)
     ctx.beginPath();
     ctx.arc(centerX, centerY, radius, Math.PI, 0, false);
-    ctx.lineWidth = 20;
+    ctx.lineWidth = 25;
     ctx.strokeStyle = "#4a4a4a";
     ctx.stroke();
 
@@ -53,14 +52,14 @@ function createLoveMeterImage(percentage) {
     const endAngle = Math.PI + (Math.PI * percentage) / 100;
     ctx.beginPath();
     ctx.arc(centerX, centerY, radius, Math.PI, endAngle, false);
-    ctx.lineWidth = 20;
+    ctx.lineWidth = 25;
     ctx.strokeStyle = gradient;
     ctx.lineCap = "round";
     ctx.stroke();
 
     // Draw needle
     const needleAngle = Math.PI + (Math.PI * percentage) / 100;
-    const needleLength = 70;
+    const needleLength = 60;
     const needleX = centerX + Math.cos(needleAngle) * needleLength;
     const needleY = centerY + Math.sin(needleAngle) * needleLength;
 
@@ -74,20 +73,9 @@ function createLoveMeterImage(percentage) {
 
     // Center circle
     ctx.beginPath();
-    ctx.arc(centerX, centerY, 10, 0, Math.PI * 2);
+    ctx.arc(centerX, centerY, 12, 0, Math.PI * 2);
     ctx.fillStyle = "#ffffff";
     ctx.fill();
-
-    // Percentage text
-    ctx.font = "bold 32px sans-serif";
-    ctx.fillStyle = "#ffffff";
-    ctx.textAlign = "center";
-    ctx.fillText(`${percentage}%`, centerX, centerY + 50);
-
-    // Title
-    ctx.font = "bold 24px sans-serif";
-    ctx.fillStyle = "#e63946";
-    ctx.fillText("LOVE METER", centerX, 35);
 
     return canvas.toBuffer("image/png");
 }
@@ -155,7 +143,9 @@ module.exports = {
             const embed = new EmbedBuilder()
                 .setColor(color)
                 .setTitle("Love Meter 💕")
-                .setDescription(`**${name1}** 💖 **${name2}**\n\n${message}`)
+                .setDescription(
+                    `**${name1}** 💖 **${name2}**\n\n**${compatibility}%** - ${message}`
+                )
                 .setImage("attachment://lovemeter.png")
                 .setFooter({
                     text: `Requested by ${interaction.user.username}`,
