@@ -144,7 +144,7 @@ module.exports = {
                 .setColor(color)
                 .setTitle("Love Meter 💕")
                 .setDescription(
-                    `**${name1}** 💖 **${name2}**\n\n**${compatibility}%** - ${message}`
+                    `<@${member1.id}> 💖 <@${member2.id}>\n\n**${compatibility}%** - ${message}`
                 )
                 .setImage("attachment://lovemeter.png")
                 .setFooter({
