@@ -1,4 +1,9 @@
-const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
+const {
+    SlashCommandBuilder,
+    EmbedBuilder,
+    AttachmentBuilder,
+} = require("discord.js");
+const { createCanvas } = require("canvas");
 
 function getCompatibility(member1, member2) {
     const data1 =
@@ -10,18 +15,86 @@ function getCompatibility(member1, member2) {
     return Math.floor((random - Math.floor(random)) * 100) + 1;
 }
 
-function createProgressBar(percentage) {
-    const filled = Math.round(percentage / 10);
-    const empty = 10 - filled;
-    return "▰".repeat(filled) + "▱".repeat(empty);
+function getShipMessage(percentage) {
+    if (percentage >= 90) return "Jir gacor takdir inimah, JODOH DARI OROK!";
+    if (percentage >= 70) return "Udah cocok, Tinggal confess aja xixi";
+    if (percentage >= 50) return "Hmm notbad masih ada kesempatan";
+    if (percentage >= 30) return "Kecil banget usaha lagi ya wkwk";
+    if (percentage >= 10) return "Maap nt HAHAHA";
 }
 
-function getShipMessage(percentage) {
-    if (percentage >= 90) return "Bucin tingkat dewa, siap nikah!";
-    if (percentage >= 70) return "Udah cocok, tinggal pdkt aja";
-    if (percentage >= 50) return "Masih ada harapan nih";
-    if (percentage >= 30) return "Butuh usaha lebih bro";
-    return "Mending cari yang lain";
+function createLoveMeterImage(percentage) {
+    const canvas = createCanvas(400, 200);
+    const ctx = canvas.getContext("2d");
+
+    // Background
+    ctx.fillStyle = "#2b2d31";
+    ctx.fillRect(0, 0, 400, 200);
+
+    // Draw meter arc background
+    const centerX = 200;
+    const centerY = 150;
+    const radius = 100;
+
+    // Background arc (grey)
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius, Math.PI, 0, false);
+    ctx.lineWidth = 20;
+    ctx.strokeStyle = "#4a4a4a";
+    ctx.stroke();
+
+    // Gradient for meter
+    const gradient = ctx.createLinearGradient(100, 0, 300, 0);
+    gradient.addColorStop(0, "#ffcccb");
+    gradient.addColorStop(0.5, "#ff6b6b");
+    gradient.addColorStop(1, "#e63946");
+
+    // Filled arc based on percentage
+    const endAngle = Math.PI + (Math.PI * percentage) / 100;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius, Math.PI, endAngle, false);
+    ctx.lineWidth = 20;
+    ctx.strokeStyle = gradient;
+    ctx.lineCap = "round";
+    ctx.stroke();
+
+    // Draw needle
+    const needleAngle = Math.PI + (Math.PI * percentage) / 100;
+    const needleLength = 70;
+    const needleX = centerX + Math.cos(needleAngle) * needleLength;
+    const needleY = centerY + Math.sin(needleAngle) * needleLength;
+
+    ctx.beginPath();
+    ctx.moveTo(centerX, centerY);
+    ctx.lineTo(needleX, needleY);
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineCap = "round";
+    ctx.stroke();
+
+    // Center circle
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, 10, 0, Math.PI * 2);
+    ctx.fillStyle = "#ffffff";
+    ctx.fill();
+
+    // Percentage text
+    ctx.font = "bold 32px Arial";
+    ctx.fillStyle = "#ffffff";
+    ctx.textAlign = "center";
+    ctx.fillText(`${percentage}%`, centerX, centerY + 50);
+
+    // Title
+    ctx.font = "bold 24px Arial";
+    ctx.fillStyle = "#e63946";
+    ctx.fillText("LOVE METER", centerX, 35);
+
+    // Hearts on sides
+    ctx.font = "30px Arial";
+    ctx.fillText("💔", 50, 130);
+    ctx.fillText("❤️", 350, 130);
+
+    return canvas.toBuffer("image/png");
 }
 
 module.exports = {
@@ -69,8 +142,12 @@ module.exports = {
             }
 
             const compatibility = getCompatibility(member1, member2);
-            const progressBar = createProgressBar(compatibility);
             const message = getShipMessage(compatibility);
+            const imageBuffer = createLoveMeterImage(compatibility);
+
+            const attachment = new AttachmentBuilder(imageBuffer, {
+                name: "lovemeter.png",
+            });
 
             let color = "#2b2d31";
             if (compatibility >= 70) color = "#ed4245";
@@ -87,22 +164,21 @@ module.exports = {
                         inline: false,
                     },
                     {
-                        name: "Compatibility",
-                        value: `${progressBar} **${compatibility}%**`,
-                        inline: false,
-                    },
-                    {
                         name: "Result",
                         value: message,
                         inline: false,
                     }
                 )
+                .setImage("attachment://lovemeter.png")
                 .setFooter({
                     text: `Requested by ${interaction.user.username}`,
                 })
                 .setTimestamp();
 
-            await interaction.editReply({ embeds: [embed] });
+            await interaction.editReply({
+                embeds: [embed],
+                files: [attachment],
+            });
         } catch (error) {
             console.error(error);
             await interaction.editReply({
