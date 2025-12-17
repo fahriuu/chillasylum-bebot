@@ -18,11 +18,28 @@ module.exports = {
         }
 
         const skipped = player.queue.current;
+        const nextTrack = player.queue[0];
+
         player.skip();
 
         const embed = new EmbedBuilder()
             .setColor("#5865f2")
             .setDescription(`⏭️ Skipped **${skipped.title}**`);
+
+        if (nextTrack) {
+            embed.addFields({
+                name: "Now Playing",
+                value: `**${nextTrack.title}** - ${
+                    nextTrack.author || "Unknown"
+                }`,
+            });
+        } else {
+            embed.addFields({
+                name: "Queue",
+                value: "No more songs in queue",
+            });
+        }
+
         return interaction.reply({ embeds: [embed] });
     },
 };

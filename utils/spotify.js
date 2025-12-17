@@ -104,10 +104,36 @@ function formatDuration(ms) {
     return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
+async function getPlaylistInfo(id, type) {
+    await refreshToken();
+
+    try {
+        if (type === "playlist") {
+            const data = await spotifyApi.getPlaylist(id);
+            return {
+                name: data.body.name,
+                thumbnail: data.body.images[0]?.url,
+                owner: data.body.owner.display_name,
+            };
+        } else if (type === "album") {
+            const data = await spotifyApi.getAlbum(id);
+            return {
+                name: data.body.name,
+                thumbnail: data.body.images[0]?.url,
+                owner: data.body.artists[0]?.name,
+            };
+        }
+    } catch (error) {
+        console.error("Spotify getPlaylistInfo error:", error.message);
+        return null;
+    }
+}
+
 module.exports = {
     isSpotifyUrl,
     parseSpotifyUrl,
     getSpotifyTrack,
     getSpotifyAlbum,
     getSpotifyPlaylist,
+    getPlaylistInfo,
 };
