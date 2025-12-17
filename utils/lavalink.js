@@ -66,54 +66,13 @@ function initLavalink(client) {
         }
     );
 
-    // Override playerEnd to ensure auto-play works
-    kazagumo.on("playerEnd", async (player, track, reason) => {
+    // Player end - just log, Kazagumo handles auto-play automatically
+    kazagumo.on("playerEnd", (player, track, reason) => {
         const trackTitle = track?.title || "Unknown";
         const endReason = reason || "finished";
         console.log(
             `⏹️ Track ended: ${trackTitle}, Reason: ${endReason}, Queue: ${player.queue.length}`
         );
-
-        // Skip if replaced (manual skip) or stopped
-        if (endReason === "replaced" || endReason === "stopped") return;
-
-        // Check if player still exists
-        const guildId = player.guildId;
-        const existingPlayer = kazagumo.players.get(guildId);
-        if (!existingPlayer) return;
-
-        // Auto play next track if queue has songs
-        if (existingPlayer.queue.length > 0) {
-            console.log(`📋 Playing next track...`);
-            try {
-                await existingPlayer.play();
-            } catch (e) {
-                console.error("Auto-play error:", e.message);
-                // Try to skip to next if play fails
-                if (existingPlayer.queue.length > 0) {
-                    existingPlayer.queue.shift();
-                    if (existingPlayer.queue.length > 0) {
-                        try {
-                            await existingPlayer.play();
-                        } catch (e2) {
-                            console.error("Retry play error:", e2.message);
-                        }
-                    }
-                }
-            }
-            return;
-        }
-
-        // Queue empty
-        const textChannel = existingPlayer.data.get("textChannel");
-        if (textChannel) {
-            const embed = new EmbedBuilder()
-                .setColor("#2b2d31")
-                .setDescription(
-                    "Queue finished. Use `/play` to add more songs."
-                );
-            safeSend(textChannel, embed);
-        }
     });
 
     // Node events
