@@ -22,6 +22,22 @@ async function playSong(guildId, song) {
         return;
     }
 
+    // Validasi URL sebelum stream
+    if (
+        !song.url ||
+        typeof song.url !== "string" ||
+        !song.url.startsWith("http")
+    ) {
+        console.error("Invalid song URL:", song.url);
+        queue.songs.shift();
+        if (queue.songs.length > 0) {
+            playSong(guildId, queue.songs[0]);
+        }
+        return;
+    }
+
+    console.log(`Playing: ${song.title} | URL: ${song.url}`);
+
     try {
         const stream = await play.stream(song.url);
         const resource = createAudioResource(stream.stream, {

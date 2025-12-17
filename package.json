@@ -14,7 +14,8 @@
         "dotenv": "^16.6.1",
         "play-dl": "^1.9.7",
         "sodium-native": "^5.0.10",
-        "spotify-url-info": "^3.2.18"
+        "spotify-url-info": "^3.2.18",
+        "spotify-web-api-node": "^5.0.2"
     },
     "devDependencies": {
         "@eslint/js": "^9.39.2",
