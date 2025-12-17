@@ -6,14 +6,13 @@ const {
     joinVoiceChannel,
     VoiceConnectionStatus,
     entersState,
-    StreamType,
 } = require("@discordjs/voice");
-const ytdl = require("@distube/ytdl-core");
+const play = require("play-dl");
+const { EmbedBuilder } = require("discord.js");
+const { getQueue, deleteQueue } = require("./musicQueue");
 
 // Set FFmpeg path
 require("ffmpeg-static");
-const { EmbedBuilder } = require("discord.js");
-const { getQueue, deleteQueue } = require("./musicQueue");
 
 async function playSong(guildId, song) {
     const queue = getQueue(guildId);
@@ -30,7 +29,7 @@ async function playSong(guildId, song) {
     if (
         !song.url ||
         typeof song.url !== "string" ||
-        !song.url.startsWith("http")
+        !song.url.includes("youtube.com")
     ) {
         console.error("Invalid song URL:", song.url);
         queue.songs.shift();
@@ -43,14 +42,10 @@ async function playSong(guildId, song) {
     console.log(`Playing: ${song.title} | URL: ${song.url}`);
 
     try {
-        const stream = ytdl(song.url, {
-            filter: "audioonly",
-            quality: "highestaudio",
-            highWaterMark: 1 << 25,
-        });
+        const streamInfo = await play.stream(song.url, { quality: 2 });
 
-        const resource = createAudioResource(stream, {
-            inputType: StreamType.Arbitrary,
+        const resource = createAudioResource(streamInfo.stream, {
+            inputType: streamInfo.type,
         });
 
         queue.player.play(resource);
@@ -62,8 +57,16 @@ async function playSong(guildId, song) {
             .setDescription(`**${song.title}**`)
             .setThumbnail(song.thumbnail)
             .addFields(
-                { name: "Artist", value: song.artist, inline: true },
-                { name: "Duration", value: song.duration, inline: true },
+                {
+                    name: "Artist",
+                    value: song.artist || "Unknown",
+                    inline: true,
+                },
+                {
+                    name: "Duration",
+                    value: song.duration || "0:00",
+                    inline: true,
+                },
                 {
                     name: "Requested by",
                     value: `<@${song.requestedBy}>`,
@@ -76,10 +79,21 @@ async function playSong(guildId, song) {
             queue.textChannel.send({ embeds: [embed] });
         }
     } catch (error) {
-        console.error("Error playing song:", error);
+        console.error("Error playing song:", error.message);
+
+        // Send error message to channel
+        if (queue.textChannel) {
+            const embed = new EmbedBuilder()
+                .setColor("#ed4245")
+                .setDescription(
+                    `Failed to play **${song.title}**. Skipping...`
+                );
+            queue.textChannel.send({ embeds: [embed] });
+        }
+
         queue.songs.shift();
-        if (queue.songs.length > 0 && queue.songs[0]?.url) {
-            playSong(guildId, queue.songs[0]);
+        if (queue.songs.length > 0) {
+            setTimeout(() => playSong(guildId, queue.songs[0]), 1000);
         } else {
             queue.playing = false;
         }
@@ -119,10 +133,10 @@ async function connectToChannel(voiceChannel, textChannel, guildId) {
     });
 
     player.on("error", (error) => {
-        console.error("Player error:", error);
+        console.error("Player error:", error.message);
         queue.songs.shift();
         if (queue.songs.length > 0) {
-            playSong(guildId, queue.songs[0]);
+            setTimeout(() => playSong(guildId, queue.songs[0]), 1000);
         }
     });
 

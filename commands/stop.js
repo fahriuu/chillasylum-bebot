@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
-const { getQueue, deleteQueue } = require("../utils/musicQueue");
+const { getKazagumo } = require("../utils/lavalink");
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -7,19 +7,17 @@ module.exports = {
         .setDescription("Stop musik dan clear queue"),
 
     async execute(interaction) {
-        const queue = getQueue(interaction.guild.id);
+        const kazagumo = getKazagumo();
+        const player = kazagumo?.players.get(interaction.guild.id);
 
-        if (!queue.connection) {
+        if (!player) {
             const embed = new EmbedBuilder()
                 .setColor("#ed4245")
                 .setDescription("Bot tidak sedang memutar musik.");
             return interaction.reply({ embeds: [embed], ephemeral: true });
         }
 
-        queue.songs = [];
-        if (queue.player) queue.player.stop();
-        if (queue.connection) queue.connection.destroy();
-        deleteQueue(interaction.guild.id);
+        player.destroy();
 
         const embed = new EmbedBuilder()
             .setColor("#ed4245")

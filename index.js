@@ -2,6 +2,7 @@ require("dotenv").config();
 const fs = require("fs");
 const path = require("path");
 const { Client, IntentsBitField, Collection } = require("discord.js");
+const { initLavalink } = require("./utils/lavalink");
 
 const client = new Client({
     intents: [
@@ -101,6 +102,9 @@ client.on("error", (error) => {
 process.on("unhandledRejection", (reason, promise) => {
     console.error("Unhandled Rejection:", reason);
 });
+
+// Init Lavalink
+initLavalink(client);
 
 // Login bot
 client.login(process.env.DISCORD_TOKEN);

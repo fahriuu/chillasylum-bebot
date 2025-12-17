@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
-const { getQueue } = require("../utils/musicQueue");
+const { getKazagumo } = require("../utils/lavalink");
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -7,31 +7,34 @@ module.exports = {
         .setDescription("Lihat daftar antrian lagu"),
 
     async execute(interaction) {
-        const queue = getQueue(interaction.guild.id);
+        const kazagumo = getKazagumo();
+        const player = kazagumo?.players.get(interaction.guild.id);
 
-        if (queue.songs.length === 0) {
+        if (!player || !player.queue.current) {
             const embed = new EmbedBuilder()
                 .setColor("#2b2d31")
                 .setDescription("Queue kosong.");
             return interaction.reply({ embeds: [embed], ephemeral: true });
         }
 
-        const current = queue.songs[0];
-        const upcoming = queue.songs.slice(1, 11);
+        const current = player.queue.current;
+        const upcoming = player.queue.slice(0, 10);
 
-        let description = `**Now Playing:**\n[${current.title}](${current.url}) - ${current.duration}\n\n`;
+        let description = `**Now Playing:**\n[${current.title}](${
+            current.uri
+        }) - ${formatDuration(current.length)}\n\n`;
 
         if (upcoming.length > 0) {
             description += "**Up Next:**\n";
-            upcoming.forEach((song, index) => {
-                description += `\`${index + 1}.\` ${song.title} - ${
-                    song.duration
-                }\n`;
+            upcoming.forEach((track, index) => {
+                description += `\`${index + 1}.\` ${
+                    track.title
+                } - ${formatDuration(track.length)}\n`;
             });
         }
 
-        if (queue.songs.length > 11) {
-            description += `\n...dan ${queue.songs.length - 11} lagu lainnya`;
+        if (player.queue.length > 10) {
+            description += `\n...dan ${player.queue.length - 10} lagu lainnya`;
         }
 
         const embed = new EmbedBuilder()
@@ -39,8 +42,14 @@ module.exports = {
             .setTitle("Music Queue")
             .setDescription(description)
             .setThumbnail(current.thumbnail)
-            .setFooter({ text: `Total: ${queue.songs.length} lagu` });
+            .setFooter({ text: `Total: ${player.queue.length + 1} lagu` });
 
         return interaction.reply({ embeds: [embed] });
     },
 };
+
+function formatDuration(ms) {
+    const seconds = Math.floor((ms / 1000) % 60);
+    const minutes = Math.floor((ms / (1000 * 60)) % 60);
+    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
