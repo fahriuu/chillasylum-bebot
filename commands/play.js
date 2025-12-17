@@ -34,8 +34,8 @@ module.exports = {
         .setDescription("Putar lagu dari Spotify atau YouTube")
         .addStringOption((option) =>
             option
-                .setName("query")
-                .setDescription("Link Spotify/YouTube atau judul lagu")
+                .setName("judul")
+                .setDescription("Judul lagu atau link Spotify/YouTube")
                 .setRequired(true)
         ),
 
@@ -69,7 +69,7 @@ module.exports = {
             return interaction.editReply({ embeds: [embed] });
         }
 
-        const query = interaction.options.getString("query");
+        const query = interaction.options.getString("judul");
 
         try {
             if (!player) {
