@@ -68,14 +68,14 @@ function initLavalink(client) {
 
     // Override playerEnd to ensure auto-play works
     kazagumo.on("playerEnd", async (player, track, reason) => {
+        const trackTitle = track?.title || "Unknown";
+        const endReason = reason || "finished";
         console.log(
-            `⏹️ Track ended: ${
-                track?.title || "Unknown"
-            }, Reason: ${reason}, Queue: ${player.queue.length}`
+            `⏹️ Track ended: ${trackTitle}, Reason: ${endReason}, Queue: ${player.queue.length}`
         );
 
         // Skip if replaced (manual skip) or stopped
-        if (reason === "replaced" || reason === "stopped") return;
+        if (endReason === "replaced" || endReason === "stopped") return;
 
         // Check if player still exists
         const guildId = player.guildId;
