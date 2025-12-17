@@ -6,8 +6,9 @@ const {
     joinVoiceChannel,
     VoiceConnectionStatus,
     entersState,
+    StreamType,
 } = require("@discordjs/voice");
-const play = require("play-dl");
+const ytdl = require("@distube/ytdl-core");
 const { EmbedBuilder } = require("discord.js");
 const { getQueue, deleteQueue } = require("./musicQueue");
 
@@ -36,14 +37,17 @@ async function playSong(guildId, song) {
         return;
     }
 
-    console.log(`Playing: ${song.title}`);
-    console.log(`URL: ${song.url}`);
-    console.log(`Song object:`, JSON.stringify(song, null, 2));
+    console.log(`Playing: ${song.title} | URL: ${song.url}`);
 
     try {
-        const stream = await play.stream(song.url);
-        const resource = createAudioResource(stream.stream, {
-            inputType: stream.type,
+        const stream = ytdl(song.url, {
+            filter: "audioonly",
+            quality: "highestaudio",
+            highWaterMark: 1 << 25,
+        });
+
+        const resource = createAudioResource(stream, {
+            inputType: StreamType.Arbitrary,
         });
 
         queue.player.play(resource);
@@ -107,7 +111,7 @@ async function connectToChannel(voiceChannel, textChannel, guildId) {
                     }
                     deleteQueue(guildId);
                 }
-            }, 300000); // 5 menit idle disconnect
+            }, 300000);
         }
     });
 
