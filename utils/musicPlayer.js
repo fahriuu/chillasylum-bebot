@@ -9,6 +9,9 @@ const {
     StreamType,
 } = require("@discordjs/voice");
 const ytdl = require("@distube/ytdl-core");
+
+// Set FFmpeg path
+require("ffmpeg-static");
 const { EmbedBuilder } = require("discord.js");
 const { getQueue, deleteQueue } = require("./musicQueue");
 
