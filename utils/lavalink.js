@@ -172,17 +172,39 @@ function initLavalink(client) {
         const duration = formatDuration(track.length);
         const requester = track.requester;
 
+        // Detect source from URI
+        const uri = track.uri || "";
+        const isSpotify = uri.includes("spotify.com");
+        const isYouTube =
+            uri.includes("youtube.com") || uri.includes("youtu.be");
+
+        // Source icons
+        const spotifyIcon =
+            "https://storage.googleapis.com/pr-newsroom-wp/1/2023/05/Spotify_Primary_Logo_RGB_Green.png";
+        const youtubeIcon =
+            "https://cdn.pixabay.com/photo/2021/05/22/11/38/yt-6273367_1280.png";
+        const defaultIcon =
+            "https://cdn-icons-png.flaticon.com/512/727/727269.png";
+
+        let sourceIcon = defaultIcon;
+        let sourceColor = "#2b2d31";
+
+        if (isSpotify) {
+            sourceIcon = spotifyIcon;
+            sourceColor = "#1DB954";
+        } else if (isYouTube) {
+            sourceIcon = youtubeIcon;
+            sourceColor = "#FF0000";
+        }
+
         const embed = new EmbedBuilder()
-            .setColor("#2b2d31")
+            .setColor(sourceColor)
             .setAuthor({
                 name: "Started playing",
-                iconURL:
-                    "https://tse2.mm.bing.net/th/id/OIP.NYf46d8C4pkLk6-5zW0jIwHaHa?cb=ucfimg2&ucfimg=1&rs=1&pid=ImgDetMain&o=7&rm=3",
+                iconURL: sourceIcon,
             })
             .setDescription(
-                `**[${title}](${
-                    track.uri || "#"
-                })**\nby ${artist} • \`${duration}\``
+                `**[${title}](${uri || "#"})**\nby ${artist} • \`${duration}\``
             )
             .setFooter({
                 text: `Requested by ${requester?.username || "Unknown"}`,
