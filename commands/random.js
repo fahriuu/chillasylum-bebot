@@ -32,6 +32,13 @@ module.exports = {
                 .setDescription("Pilih genre")
                 .setRequired(true)
                 .addChoices(...genreChoices)
+        )
+        .addIntegerOption((option) =>
+            option
+                .setName("jumlah")
+                .setDescription("Jumlah lagu (1-10)")
+                .setMinValue(1)
+                .setMaxValue(10)
         ),
 
     async execute(interaction) {
@@ -64,6 +71,7 @@ module.exports = {
         }
 
         const genre = interaction.options.getString("genre");
+        const jumlah = interaction.options.getInteger("jumlah") || 1;
         const queries = genreQueries[genre];
         const randomQuery = queries[Math.floor(Math.random() * queries.length)];
 
@@ -90,27 +98,39 @@ module.exports = {
             }
             player.data.set("textChannel", interaction.channel);
 
-            // Pick random track from results
-            const randomIndex = Math.floor(
-                Math.random() * Math.min(result.tracks.length, 10)
-            );
-            const track = result.tracks[randomIndex];
-            player.queue.add(track);
+            // Pick random tracks from results
+            const availableTracks = result.tracks.slice(0, 20);
+            const shuffled = availableTracks.sort(() => Math.random() - 0.5);
+            const selectedTracks = shuffled.slice(0, jumlah);
+
+            for (const track of selectedTracks) {
+                player.queue.add(track);
+            }
 
             if (!player.playing && !player.paused) {
                 await player.play();
             }
 
+            let description;
+            if (selectedTracks.length === 1) {
+                const track = selectedTracks[0];
+                description = `**[${track.title}](${track.uri})**\nby ${track.author}`;
+            } else {
+                description = selectedTracks
+                    .map((t, i) => `\`${i + 1}.\` **${t.title}** • ${t.author}`)
+                    .join("\n");
+            }
+
             const embed = new EmbedBuilder()
                 .setColor("#5865F2")
                 .setAuthor({ name: "🎲 Random Music" })
-                .setDescription(
-                    `**[${track.title}](${track.uri})**\nby ${track.author}`
-                )
+                .setDescription(description)
                 .setFooter({
                     text: `Genre: ${
                         genre.charAt(0).toUpperCase() + genre.slice(1)
-                    } • Requested by ${interaction.user.username}`,
+                    } • ${selectedTracks.length} lagu • ${
+                        interaction.user.username
+                    }`,
                     iconURL: interaction.user.displayAvatarURL(),
                 });
 
