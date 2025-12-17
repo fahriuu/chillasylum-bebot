@@ -177,6 +177,45 @@ async function getPlaylistInfo(id, type) {
     }
 }
 
+// Get recommendations based on genre seeds
+async function getSpotifyRecommendations(genre, limit = 10) {
+    const tokenOk = await refreshToken();
+    if (!tokenOk) return null;
+
+    try {
+        const data = await spotifyApi.getRecommendations({
+            seed_genres: [genre],
+            limit: limit,
+            min_popularity: 30,
+        });
+
+        return data.body.tracks.map((track) => ({
+            title: track.name,
+            artist: track.artists.map((a) => a.name).join(", "),
+            duration: formatDuration(track.duration_ms),
+            thumbnail: track.album.images[0]?.url,
+            query: `${track.name} ${track.artists[0]?.name || ""}`,
+        }));
+    } catch (error) {
+        console.error("Spotify recommendations error:", error.message);
+        return null;
+    }
+}
+
+// Get available genre seeds
+async function getAvailableGenres() {
+    const tokenOk = await refreshToken();
+    if (!tokenOk) return null;
+
+    try {
+        const data = await spotifyApi.getAvailableGenreSeeds();
+        return data.body.genres;
+    } catch (error) {
+        console.error("Spotify genres error:", error.message);
+        return null;
+    }
+}
+
 module.exports = {
     isSpotifyUrl,
     parseSpotifyUrl,
@@ -185,4 +224,6 @@ module.exports = {
     getSpotifyPlaylist,
     getSpotifyArtistTopTracks,
     getPlaylistInfo,
+    getSpotifyRecommendations,
+    getAvailableGenres,
 };

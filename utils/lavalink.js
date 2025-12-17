@@ -131,11 +131,11 @@ function initLavalink(client) {
         const duration = formatDuration(track.length);
         const requester = track.requester;
 
-        // Source icons
+        // Source icons (official)
         const spotifyIcon =
-            "https://storage.googleapis.com/pr-newsroom-wp/1/2023/05/Spotify_Primary_Logo_RGB_Green.png";
+            "https://open.spotifycdn.com/cdn/images/favicon32.b64ecc03.png";
         const youtubeIcon =
-            "https://cdn.pixabay.com/photo/2021/05/22/11/38/yt-6273367_1280.png";
+            "https://www.youtube.com/s/desktop/f506bd45/img/favicon_32.png";
 
         // Check source from track (set in play.js) or fallback to URI detection
         const trackSource = track.source || "";

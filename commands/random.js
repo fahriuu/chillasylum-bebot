@@ -1,95 +1,32 @@
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const { getKazagumo } = require("../utils/lavalink");
+const { getSpotifyRecommendations } = require("../utils/spotify");
 
-// Curated playlists by genre/mood
-const playlists = {
-    pop: [
-        "pop hits 2024",
-        "top 50 global",
-        "viral hits",
-        "dance pop mix",
-        "feel good pop",
-    ],
-    hiphop: [
-        "hip hop hits",
-        "rap caviar",
-        "hip hop mix 2024",
-        "trap nation",
-        "rap hits",
-    ],
-    rock: [
-        "rock classics",
-        "alternative rock",
-        "indie rock mix",
-        "rock anthems",
-        "modern rock",
-    ],
-    edm: [
-        "edm hits",
-        "electronic dance",
-        "house music mix",
-        "bass boosted",
-        "festival bangers",
-    ],
-    lofi: [
-        "lofi hip hop",
-        "lofi beats to study",
-        "chill lofi",
-        "lofi sleep",
-        "lofi cafe",
-    ],
-    jazz: [
-        "jazz classics",
-        "smooth jazz",
-        "jazz cafe",
-        "jazz vibes",
-        "modern jazz",
-    ],
-    kpop: [
-        "kpop hits 2024",
-        "kpop dance",
-        "kpop ballad",
-        "kpop mix",
-        "top kpop songs",
-    ],
-    jpop: [
-        "jpop hits",
-        "anime openings",
-        "japanese pop",
-        "j-rock mix",
-        "anime songs",
-    ],
-    indo: [
-        "lagu indonesia terbaru",
-        "pop indonesia",
-        "hits indonesia 2024",
-        "dangdut remix",
-        "indonesian viral",
-    ],
-    chill: [
-        "chill vibes",
-        "relaxing music",
-        "acoustic chill",
-        "sunday morning",
-        "peaceful piano",
-    ],
-    workout: [
-        "workout motivation",
-        "gym music",
-        "running playlist",
-        "beast mode",
-        "power workout",
-    ],
-    sad: [
-        "sad songs",
-        "broken heart",
-        "sad playlist",
-        "emotional songs",
-        "crying playlist",
-    ],
+// Spotify genre seeds mapping
+const genreMap = {
+    pop: "pop",
+    hiphop: "hip-hop",
+    rock: "rock",
+    edm: "edm",
+    lofi: "chill",
+    jazz: "jazz",
+    kpop: "k-pop",
+    jpop: "j-pop",
+    indo: "indonesian",
+    chill: "chill",
+    workout: "work-out",
+    sad: "sad",
+    rnb: "r-n-b",
+    metal: "metal",
+    acoustic: "acoustic",
+    classical: "classical",
+    country: "country",
+    reggae: "reggae",
+    latin: "latin",
+    anime: "anime",
 };
 
-const genreChoices = Object.keys(playlists).map((g) => ({
+const genreChoices = Object.keys(genreMap).map((g) => ({
     name: g.charAt(0).toUpperCase() + g.slice(1),
     value: g,
 }));
@@ -97,20 +34,20 @@ const genreChoices = Object.keys(playlists).map((g) => ({
 module.exports = {
     data: new SlashCommandBuilder()
         .setName("random")
-        .setDescription("Play random music based on genre/mood")
+        .setDescription("Play random music dari Spotify recommendations")
         .addStringOption((option) =>
             option
                 .setName("genre")
-                .setDescription("Pick a genre or mood")
+                .setDescription("Pilih genre")
                 .setRequired(true)
                 .addChoices(...genreChoices)
         )
         .addIntegerOption((option) =>
             option
                 .setName("count")
-                .setDescription("How many songs (1-10)")
+                .setDescription("Jumlah lagu (1-20)")
                 .setMinValue(1)
-                .setMaxValue(10)
+                .setMaxValue(20)
         ),
 
     async execute(interaction) {
@@ -132,7 +69,6 @@ module.exports = {
             return interaction.editReply({ embeds: [embed] });
         }
 
-        // Check if bot is in different voice channel
         let player = kazagumo.players.get(interaction.guild.id);
         if (player && player.voiceId !== voiceChannel.id) {
             const embed = new EmbedBuilder()
@@ -144,9 +80,25 @@ module.exports = {
         }
 
         const genre = interaction.options.getString("genre");
-        const count = interaction.options.getInteger("count") || 5;
+        const count = interaction.options.getInteger("count") || 10;
+        const spotifyGenre = genreMap[genre];
 
         try {
+            // Get recommendations from Spotify
+            const recommendations = await getSpotifyRecommendations(
+                spotifyGenre,
+                count
+            );
+
+            if (!recommendations || recommendations.length === 0) {
+                const embed = new EmbedBuilder()
+                    .setColor("#ed4245")
+                    .setDescription(
+                        "Tidak bisa mendapatkan rekomendasi. Coba genre lain."
+                    );
+                return interaction.editReply({ embeds: [embed] });
+            }
+
             if (!player) {
                 player = await kazagumo.createPlayer({
                     guildId: interaction.guild.id,
@@ -158,42 +110,30 @@ module.exports = {
             }
             player.data.set("textChannel", interaction.channel);
 
-            // Pick random search queries from genre
-            const queries = playlists[genre];
-            const shuffled = queries.sort(() => Math.random() - 0.5);
-            const selectedQueries = shuffled.slice(0, Math.ceil(count / 2));
-
             const addedTracks = [];
 
-            for (const query of selectedQueries) {
-                const result = await kazagumo.search(query, {
+            // Search and add tracks to queue
+            for (const rec of recommendations) {
+                const result = await kazagumo.search(rec.query, {
                     requester: interaction.user,
                 });
 
                 if (result.tracks.length > 0) {
-                    // Pick random tracks from results
-                    const shuffledTracks = result.tracks
-                        .slice(0, 10)
-                        .sort(() => Math.random() - 0.5);
-                    const tracksToAdd = shuffledTracks.slice(
-                        0,
-                        Math.ceil(count / selectedQueries.length)
-                    );
-
-                    for (const track of tracksToAdd) {
-                        if (addedTracks.length >= count) break;
-                        track.source = "youtube"; // Random search uses YouTube
-                        player.queue.add(track);
-                        addedTracks.push(track);
-                    }
+                    const track = result.tracks[0];
+                    track.source = "spotify";
+                    player.queue.add(track);
+                    addedTracks.push({
+                        title: rec.title,
+                        artist: rec.artist,
+                        duration: rec.duration,
+                    });
                 }
-                if (addedTracks.length >= count) break;
             }
 
             if (addedTracks.length === 0) {
                 const embed = new EmbedBuilder()
                     .setColor("#ed4245")
-                    .setDescription("Tidak bisa menemukan lagu random.");
+                    .setDescription("Tidak bisa menemukan lagu.");
                 return interaction.editReply({ embeds: [embed] });
             }
 
@@ -207,16 +147,29 @@ module.exports = {
 
             const trackList = addedTracks
                 .slice(0, 10)
-                .map((t, i) => `\`${i + 1}.\` ${t.title}`)
+                .map(
+                    (t, i) =>
+                        `\`${i + 1}.\` ${t.title} • ${t.artist} \`${
+                            t.duration
+                        }\``
+                )
                 .join("\n");
+
+            const remaining = addedTracks.length - 10;
+            const moreText =
+                remaining > 0 ? `\n\n\`+${remaining} more tracks\`` : "";
 
             const embed = new EmbedBuilder()
                 .setColor("#1DB954")
-                .setAuthor({ name: "🎲 Random Music" })
+                .setAuthor({
+                    name: "🎲 Spotify Recommendations",
+                    iconURL:
+                        "https://open.spotifycdn.com/cdn/images/favicon32.b64ecc03.png",
+                })
                 .setTitle(
                     `${genre.charAt(0).toUpperCase() + genre.slice(1)} Mix`
                 )
-                .setDescription(trackList)
+                .setDescription(`${trackList}${moreText}`)
                 .setFooter({
                     text: `${addedTracks.length} tracks • Requested by ${interaction.user.username}`,
                     iconURL: interaction.user.displayAvatarURL(),
