@@ -17,14 +17,26 @@ module.exports = {
             return interaction.reply({ embeds: [embed], ephemeral: true });
         }
 
-        const skipped = player.queue.current;
+        const currentTrack = player.queue.current;
+
+        // Check if user is the requester
+        if (currentTrack.requester?.id !== interaction.user.id) {
+            const embed = new EmbedBuilder()
+                .setColor("#ed4245")
+                .setDescription(
+                    `Hanya <@${currentTrack.requester?.id}> yang bisa skip lagu ini.`
+                );
+            return interaction.reply({ embeds: [embed], ephemeral: true });
+        }
+
+        const skipped = currentTrack;
         const nextTrack = player.queue[0];
 
         player.skip();
 
         const embed = new EmbedBuilder()
             .setColor("#5865f2")
-            .setDescription(`⏭️ Skipped **${skipped.title}**`);
+            .setDescription(` Skipped **${skipped.title}**`);
 
         if (nextTrack) {
             embed.addFields({

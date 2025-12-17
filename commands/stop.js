@@ -17,11 +17,26 @@ module.exports = {
             return interaction.reply({ embeds: [embed], ephemeral: true });
         }
 
+        const currentTrack = player.queue.current;
+
+        // Check if user is the requester
+        if (
+            currentTrack &&
+            currentTrack.requester?.id !== interaction.user.id
+        ) {
+            const embed = new EmbedBuilder()
+                .setColor("#ed4245")
+                .setDescription(
+                    `Hanya <@${currentTrack.requester?.id}> yang bisa stop musik.`
+                );
+            return interaction.reply({ embeds: [embed], ephemeral: true });
+        }
+
         player.destroy();
 
         const embed = new EmbedBuilder()
             .setColor("#ed4245")
-            .setDescription("⏹️ Musik dihentikan dan queue di-clear.");
+            .setDescription(" Musik dihentikan dan queue di-clear.");
         return interaction.reply({ embeds: [embed] });
     },
 };

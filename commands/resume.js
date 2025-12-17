@@ -17,6 +17,18 @@ module.exports = {
             return interaction.reply({ embeds: [embed], ephemeral: true });
         }
 
+        const currentTrack = player.queue.current;
+
+        // Check if user is the requester
+        if (currentTrack.requester?.id !== interaction.user.id) {
+            const embed = new EmbedBuilder()
+                .setColor("#ed4245")
+                .setDescription(
+                    `Hanya <@${currentTrack.requester?.id}> yang bisa resume lagu ini.`
+                );
+            return interaction.reply({ embeds: [embed], ephemeral: true });
+        }
+
         if (!player.paused) {
             const embed = new EmbedBuilder()
                 .setColor("#fee75c")
