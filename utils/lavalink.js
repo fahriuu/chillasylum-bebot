@@ -2,24 +2,12 @@ const { Kazagumo } = require("kazagumo");
 const { Connectors } = require("shoukaku");
 const { EmbedBuilder } = require("discord.js");
 
-// Public Lavalink nodes - multiple for fallback
+// Lavalink node - single reliable node
 const nodes = [
     {
         name: "Lavalink-Main",
         url: "lavalink.jirayu.net:13592",
         auth: "youshallnotpass",
-        secure: false,
-    },
-    {
-        name: "Lavalink-Backup1",
-        url: "lava.link:80",
-        auth: "anything",
-        secure: false,
-    },
-    {
-        name: "Lavalink-Backup2",
-        url: "lavalink.lexnet.cc:2333",
-        auth: "lexn3tl@val!nk",
         secure: false,
     },
 ];
