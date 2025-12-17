@@ -107,6 +107,9 @@ module.exports = {
                     return interaction.editReply({ embeds: [embed] });
                 }
 
+                // Get starting position in queue before adding
+                const startPosition = player.queue.length;
+
                 // Add all tracks to queue
                 let addedCount = 0;
                 for (const spotifyTrack of spotifyTracks) {
@@ -123,13 +126,14 @@ module.exports = {
                     player.play();
                 }
 
-                // Build track list
+                // Build track list with actual queue position
                 const trackList = spotifyTracks
                     .slice(0, 10)
                     .map((t, i) => {
                         const title = truncate(t.title, 30);
                         const artist = truncate(t.artist, 20);
-                        return `\`${String(i + 1).padStart(
+                        const queuePos = startPosition + i + 1;
+                        return `\`${String(queuePos).padStart(
                             2,
                             " "
                         )}.\` ${title} • ${artist} \`${t.duration}\``;

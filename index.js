@@ -3,6 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const { Client, IntentsBitField, Collection } = require("discord.js");
 const { initLavalink } = require("./utils/lavalink");
+const { startAuthServer } = require("./utils/spotifyAuth");
 
 const client = new Client({
     intents: [
@@ -101,6 +102,9 @@ process.on("unhandledRejection", (reason, promise) => {
 
 // Init Lavalink
 initLavalink(client);
+
+// Start Spotify Auth Server
+startAuthServer();
 
 // Login bot
 client.login(process.env.DISCORD_TOKEN);
