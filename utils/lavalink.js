@@ -221,7 +221,7 @@ function initLavalink(client) {
                     // Ignore if already destroyed
                 }
             }
-        }, 300000); // 5 menit
+        }, 180000); // 3 menit
 
         // Store timeout to clear if new song added
         player.data.set("disconnectTimeout", timeoutId);
