@@ -9,6 +9,24 @@ const {
     getPlaylistInfo,
 } = require("../utils/spotify");
 
+// Helper: truncate text
+function truncate(str, max) {
+    return str.length > max ? str.slice(0, max - 3) + "..." : str;
+}
+
+// Helper: format duration
+function formatDuration(ms) {
+    const seconds = Math.floor((ms / 1000) % 60);
+    const minutes = Math.floor((ms / (1000 * 60)) % 60);
+    const hours = Math.floor(ms / (1000 * 60 * 60));
+    if (hours > 0) {
+        return `${hours}:${minutes.toString().padStart(2, "0")}:${seconds
+            .toString()
+            .padStart(2, "0")}`;
+    }
+    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
+
 module.exports = {
     data: new SlashCommandBuilder()
         .setName("play")
@@ -42,7 +60,6 @@ module.exports = {
         const query = interaction.options.getString("query");
 
         try {
-            // Create or get player
             let player = kazagumo.players.get(interaction.guild.id);
 
             if (!player) {
@@ -106,52 +123,42 @@ module.exports = {
                     player.play();
                 }
 
-                // Build track list (max 10)
+                // Build track list
                 const trackList = spotifyTracks
                     .slice(0, 10)
-                    .map(
-                        (t, i) =>
-                            `\`${i + 1}.\` **${t.title}** - ${t.artist} \`${
-                                t.duration
-                            }\``
-                    )
+                    .map((t, i) => {
+                        const title = truncate(t.title, 30);
+                        const artist = truncate(t.artist, 20);
+                        return `\`${String(i + 1).padStart(
+                            2,
+                            " "
+                        )}.\` ${title} • ${artist} \`${t.duration}\``;
+                    })
                     .join("\n");
 
+                const remaining = spotifyTracks.length - 10;
                 const moreText =
-                    spotifyTracks.length > 10
-                        ? `\n\n...dan ${spotifyTracks.length - 10} lagu lainnya`
-                        : "";
+                    remaining > 0 ? `\n\n\`+${remaining} more tracks\`` : "";
 
                 const embed = new EmbedBuilder()
                     .setColor("#1DB954")
-                    .setAuthor({
-                        name: "Spotify Playlist",
-                        iconURL: "https://i.imgur.com/3tZ2G8K.png",
-                    })
+                    .setAuthor({ name: "🎵 Added to Queue" })
                     .setTitle(playlistInfo?.name || "Playlist")
+                    .setURL(query)
                     .setDescription(`${trackList}${moreText}`)
                     .setThumbnail(
                         playlistInfo?.thumbnail || spotifyTracks[0]?.thumbnail
                     )
-                    .addFields(
-                        {
-                            name: "Total Tracks",
-                            value: `${addedCount}`,
-                            inline: true,
-                        },
-                        {
-                            name: "Requested by",
-                            value: `<@${interaction.user.id}>`,
-                            inline: true,
-                        }
-                    )
-                    .setFooter({ text: "Use /skip to skip current song" })
+                    .setFooter({
+                        text: `${addedCount} tracks • Requested by ${interaction.user.username}`,
+                        iconURL: interaction.user.displayAvatarURL(),
+                    })
                     .setTimestamp();
 
                 return interaction.editReply({ embeds: [embed] });
             }
 
-            // Handle regular search query
+            // Handle regular search
             const result = await kazagumo.search(query, {
                 requester: interaction.user,
             });
@@ -166,36 +173,35 @@ module.exports = {
             const track = result.tracks[0];
             player.queue.add(track);
 
-            if (!player.playing && !player.paused) {
+            const isPlaying = player.playing || player.paused;
+            if (!isPlaying) {
                 player.play();
             }
 
             const embed = new EmbedBuilder()
                 .setColor("#1DB954")
-                .setTitle(
-                    player.queue.length > 1 ? "Added to Queue" : "Now Playing"
-                )
-                .setDescription(`**${track.title}**`)
+                .setAuthor({
+                    name: isPlaying ? "🎵 Added to Queue" : "🎵 Now Playing",
+                })
+                .setTitle(truncate(track.title, 50))
+                .setURL(track.uri)
                 .setThumbnail(track.thumbnail || null)
+                .setDescription(`by **${track.author || "Unknown"}**`)
                 .addFields(
                     {
-                        name: "Artist",
-                        value: track.author || "Unknown",
-                        inline: true,
-                    },
-                    {
                         name: "Duration",
-                        value: formatDuration(track.length),
+                        value: `\`${formatDuration(track.length)}\``,
                         inline: true,
                     },
                     {
                         name: "Position",
-                        value: `#${player.queue.length}`,
+                        value: `\`#${player.queue.length}\``,
                         inline: true,
                     }
                 )
                 .setFooter({
                     text: `Requested by ${interaction.user.username}`,
+                    iconURL: interaction.user.displayAvatarURL(),
                 })
                 .setTimestamp();
 
@@ -209,16 +215,3 @@ module.exports = {
         }
     },
 };
-
-function formatDuration(ms) {
-    const seconds = Math.floor((ms / 1000) % 60);
-    const minutes = Math.floor((ms / (1000 * 60)) % 60);
-    const hours = Math.floor(ms / (1000 * 60 * 60));
-
-    if (hours > 0) {
-        return `${hours}:${minutes.toString().padStart(2, "0")}:${seconds
-            .toString()
-            .padStart(2, "0")}`;
-    }
-    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-}
