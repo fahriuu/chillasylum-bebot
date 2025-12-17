@@ -1,32 +1,23 @@
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const { getKazagumo } = require("../utils/lavalink");
-const { getSpotifyRecommendations } = require("../utils/spotify");
 
-// Valid Spotify genre seeds (official working seeds)
-const genreMap = {
-    pop: "pop",
-    hiphop: "hip-hop",
-    rock: "rock",
-    edm: "edm",
-    chill: "chill",
-    jazz: "jazz",
-    kpop: "k-pop",
-    metal: "metal",
-    acoustic: "acoustic",
-    classical: "classical",
-    country: "country",
-    reggae: "reggae",
-    latin: "latin",
-    indie: "indie",
-    electronic: "electronic",
-    dance: "dance",
-    soul: "soul",
-    blues: "blues",
-    rnb: "r-n-b",
-    anime: "anime",
+// Random search queries per genre
+const genreQueries = {
+    pop: ["top hits 2024", "pop music mix", "billboard hits"],
+    rock: ["rock music mix", "classic rock hits", "rock anthems"],
+    hiphop: ["hip hop mix 2024", "rap hits", "hip hop playlist"],
+    edm: ["edm mix", "electronic dance music", "edm hits"],
+    jazz: ["jazz music", "smooth jazz", "jazz classics"],
+    kpop: ["kpop hits", "kpop mix 2024", "korean pop"],
+    metal: ["metal music mix", "heavy metal hits", "metal playlist"],
+    acoustic: ["acoustic covers", "acoustic music", "acoustic hits"],
+    classical: ["classical music", "piano classical", "orchestra music"],
+    indie: ["indie music mix", "indie hits", "indie playlist"],
+    rnb: ["rnb music mix", "r&b hits", "rnb playlist"],
+    lofi: ["lofi hip hop", "lofi beats", "lofi music"],
 };
 
-const genreChoices = Object.keys(genreMap).map((g) => ({
+const genreChoices = Object.keys(genreQueries).map((g) => ({
     name: g.charAt(0).toUpperCase() + g.slice(1),
     value: g,
 }));
@@ -34,20 +25,13 @@ const genreChoices = Object.keys(genreMap).map((g) => ({
 module.exports = {
     data: new SlashCommandBuilder()
         .setName("random")
-        .setDescription("Play random music dari Spotify recommendations")
+        .setDescription("Play random music berdasarkan genre")
         .addStringOption((option) =>
             option
                 .setName("genre")
                 .setDescription("Pilih genre")
                 .setRequired(true)
                 .addChoices(...genreChoices)
-        )
-        .addIntegerOption((option) =>
-            option
-                .setName("count")
-                .setDescription("Jumlah lagu (1-20)")
-                .setMinValue(1)
-                .setMaxValue(20)
         ),
 
     async execute(interaction) {
@@ -80,22 +64,18 @@ module.exports = {
         }
 
         const genre = interaction.options.getString("genre");
-        const count = interaction.options.getInteger("count") || 10;
-        const spotifyGenre = genreMap[genre];
+        const queries = genreQueries[genre];
+        const randomQuery = queries[Math.floor(Math.random() * queries.length)];
 
         try {
-            // Get recommendations from Spotify
-            const recommendations = await getSpotifyRecommendations(
-                spotifyGenre,
-                count
-            );
+            const result = await kazagumo.search(randomQuery, {
+                requester: interaction.user,
+            });
 
-            if (!recommendations || recommendations.length === 0) {
+            if (!result.tracks.length) {
                 const embed = new EmbedBuilder()
                     .setColor("#ed4245")
-                    .setDescription(
-                        "Tidak bisa mendapatkan rekomendasi. Coba genre lain."
-                    );
+                    .setDescription("Tidak bisa menemukan lagu.");
                 return interaction.editReply({ embeds: [embed] });
             }
 
@@ -110,71 +90,29 @@ module.exports = {
             }
             player.data.set("textChannel", interaction.channel);
 
-            const addedTracks = [];
-
-            // Search and add tracks to queue
-            for (const rec of recommendations) {
-                const result = await kazagumo.search(rec.query, {
-                    requester: interaction.user,
-                });
-
-                if (result.tracks.length > 0) {
-                    const track = result.tracks[0];
-                    track.source = "spotify";
-                    player.queue.add(track);
-                    addedTracks.push({
-                        title: rec.title,
-                        artist: rec.artist,
-                        duration: rec.duration,
-                    });
-                }
-            }
-
-            if (addedTracks.length === 0) {
-                const embed = new EmbedBuilder()
-                    .setColor("#ed4245")
-                    .setDescription("Tidak bisa menemukan lagu.");
-                return interaction.editReply({ embeds: [embed] });
-            }
+            // Pick random track from results
+            const randomIndex = Math.floor(
+                Math.random() * Math.min(result.tracks.length, 10)
+            );
+            const track = result.tracks[randomIndex];
+            player.queue.add(track);
 
             if (!player.playing && !player.paused) {
-                try {
-                    await player.play();
-                } catch (e) {
-                    console.error("Play error:", e.message);
-                }
+                await player.play();
             }
 
-            const trackList = addedTracks
-                .slice(0, 10)
-                .map(
-                    (t, i) =>
-                        `\`${i + 1}.\` ${t.title} • ${t.artist} \`${
-                            t.duration
-                        }\``
-                )
-                .join("\n");
-
-            const remaining = addedTracks.length - 10;
-            const moreText =
-                remaining > 0 ? `\n\n\`+${remaining} more tracks\`` : "";
-
             const embed = new EmbedBuilder()
-                .setColor("#1DB954")
-                .setAuthor({
-                    name: "🎲 Spotify Recommendations",
-                    iconURL:
-                        "https://open.spotifycdn.com/cdn/images/favicon32.b64ecc03.png",
-                })
-                .setTitle(
-                    `${genre.charAt(0).toUpperCase() + genre.slice(1)} Mix`
+                .setColor("#5865F2")
+                .setAuthor({ name: "🎲 Random Music" })
+                .setDescription(
+                    `**[${track.title}](${track.uri})**\nby ${track.author}`
                 )
-                .setDescription(`${trackList}${moreText}`)
                 .setFooter({
-                    text: `${addedTracks.length} tracks • Requested by ${interaction.user.username}`,
+                    text: `Genre: ${
+                        genre.charAt(0).toUpperCase() + genre.slice(1)
+                    } • Requested by ${interaction.user.username}`,
                     iconURL: interaction.user.displayAvatarURL(),
-                })
-                .setTimestamp();
+                });
 
             return interaction.editReply({ embeds: [embed] });
         } catch (error) {

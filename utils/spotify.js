@@ -202,8 +202,14 @@ async function getSpotifyRecommendations(genre, limit = 10) {
             query: `${track.name} ${track.artists[0]?.name || ""}`,
         }));
     } catch (error) {
-        const errMsg =
-            error.body?.error?.message || error.message || "Unknown error";
+        let errMsg = "Unknown error";
+        if (error.body?.error?.message) {
+            errMsg = error.body.error.message;
+        } else if (error.message) {
+            errMsg = error.message;
+        } else if (typeof error === "object") {
+            errMsg = JSON.stringify(error);
+        }
         console.error(`Spotify recommendations error for "${genre}":`, errMsg);
         return null;
     }
