@@ -182,6 +182,7 @@ module.exports = {
 
                     for (const track of tracksToAdd) {
                         if (addedTracks.length >= count) break;
+                        track.source = "youtube"; // Random search uses YouTube
                         player.queue.add(track);
                         addedTracks.push(track);
                     }

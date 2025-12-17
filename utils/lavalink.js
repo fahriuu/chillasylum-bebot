@@ -172,29 +172,22 @@ function initLavalink(client) {
         const duration = formatDuration(track.length);
         const requester = track.requester;
 
-        // Detect source from URI
-        const uri = track.uri || "";
-        const isSpotify = uri.includes("spotify.com");
-        const isYouTube =
-            uri.includes("youtube.com") || uri.includes("youtu.be");
-
         // Source icons
         const spotifyIcon =
             "https://storage.googleapis.com/pr-newsroom-wp/1/2023/05/Spotify_Primary_Logo_RGB_Green.png";
         const youtubeIcon =
             "https://cdn.pixabay.com/photo/2021/05/22/11/38/yt-6273367_1280.png";
-        const defaultIcon =
-            "https://cdn-icons-png.flaticon.com/512/727/727269.png";
 
-        let sourceIcon = defaultIcon;
-        let sourceColor = "#2b2d31";
+        // Check source from track (set in play.js) or fallback to URI detection
+        const trackSource = track.source || "";
+        const uri = track.uri || "";
 
-        if (isSpotify) {
+        let sourceIcon = youtubeIcon;
+        let sourceColor = "#FF0000";
+
+        if (trackSource === "spotify" || uri.includes("spotify.com")) {
             sourceIcon = spotifyIcon;
             sourceColor = "#1DB954";
-        } else if (isYouTube) {
-            sourceIcon = youtubeIcon;
-            sourceColor = "#FF0000";
         }
 
         const embed = new EmbedBuilder()

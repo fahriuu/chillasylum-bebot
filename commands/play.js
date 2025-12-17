@@ -138,7 +138,9 @@ module.exports = {
                         requester: interaction.user,
                     });
                     if (result.tracks.length > 0) {
-                        player.queue.add(result.tracks[0]);
+                        const track = result.tracks[0];
+                        track.source = "spotify"; // Mark as Spotify source
+                        player.queue.add(track);
                         addedCount++;
                     }
                 }
@@ -200,6 +202,14 @@ module.exports = {
             }
 
             const track = result.tracks[0];
+            // Detect source from query or URI
+            if (query.includes("youtube.com") || query.includes("youtu.be")) {
+                track.source = "youtube";
+            } else if (query.includes("spotify.com")) {
+                track.source = "spotify";
+            } else {
+                track.source = "youtube"; // Default search goes to YouTube
+            }
             player.queue.add(track);
 
             const isPlaying = player.playing || player.paused;
