@@ -66,6 +66,40 @@ function initLavalink(client) {
         }
     );
 
+    // Override playerEnd to ensure auto-play works
+    kazagumo.on("playerEnd", async (player, track, reason) => {
+        console.log(
+            `⏹️ Track ended: ${
+                track?.title || "Unknown"
+            }, Reason: ${reason}, Queue: ${player.queue.length}`
+        );
+
+        // Skip if replaced (manual skip) or stopped
+        if (reason === "replaced" || reason === "stopped") return;
+
+        // Auto play next track if queue has songs
+        if (player.queue.length > 0) {
+            console.log(`📋 Playing next track...`);
+            try {
+                await player.play();
+            } catch (e) {
+                console.error("Auto-play error:", e);
+            }
+            return;
+        }
+
+        // Queue empty
+        const textChannel = player.data.get("textChannel");
+        if (textChannel) {
+            const embed = new EmbedBuilder()
+                .setColor("#2b2d31")
+                .setDescription(
+                    "Queue finished. Use `/play` to add more songs."
+                );
+            safeSend(textChannel, embed);
+        }
+    });
+
     // Node events
     kazagumo.shoukaku.on("ready", async (name, reconnected) => {
         console.log(`✅ Lavalink node "${name}" connected`);
@@ -138,32 +172,6 @@ function initLavalink(client) {
                 text: `Requested by ${requester?.username || "Unknown"}`,
                 iconURL: requester?.displayAvatarURL?.() || undefined,
             });
-
-        safeSend(textChannel, embed);
-    });
-
-    // Player end - Auto play next or show queue finished
-    kazagumo.on("playerEnd", (player, track, reason) => {
-        console.log(
-            `⏹️ Track ended: ${track?.title || "Unknown"}, Reason: ${reason}`
-        );
-
-        // If there are more tracks in queue, play next
-        if (player.queue.length > 0) {
-            console.log(
-                `📋 Queue has ${player.queue.length} tracks, playing next...`
-            );
-            player.play();
-            return;
-        }
-
-        // Queue is empty
-        const textChannel = player.data.get("textChannel");
-        if (!textChannel) return;
-
-        const embed = new EmbedBuilder()
-            .setColor("#2b2d31")
-            .setDescription("Queue finished. Use `/play` to add more songs.");
 
         safeSend(textChannel, embed);
     });
