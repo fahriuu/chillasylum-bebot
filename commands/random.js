@@ -1,24 +1,99 @@
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const { getKazagumo } = require("../utils/lavalink");
 
-// Random search queries per genre
+// Random search queries per genre (latest 2025)
 const genreQueries = {
-    pop: ["top hits 2024", "pop music mix", "billboard hits"],
-    rock: ["rock music mix", "classic rock hits", "rock anthems"],
-    hiphop: ["hip hop mix 2024", "rap hits", "hip hop playlist"],
-    edm: ["edm mix", "electronic dance music", "edm hits"],
-    jazz: ["jazz music", "smooth jazz", "jazz classics"],
-    kpop: ["kpop hits", "kpop mix 2024", "korean pop"],
-    metal: ["metal music mix", "heavy metal hits", "metal playlist"],
-    acoustic: ["acoustic covers", "acoustic music", "acoustic hits"],
-    classical: ["classical music", "piano classical", "orchestra music"],
-    indie: ["indie music mix", "indie hits", "indie playlist"],
-    rnb: ["rnb music mix", "r&b hits", "rnb playlist"],
-    lofi: ["lofi hip hop", "lofi beats", "lofi music"],
+    pop: [
+        "new pop songs 2025",
+        "latest pop hits 2025",
+        "trending pop music 2025",
+        "viral pop songs 2025",
+    ],
+    rock: ["new rock songs 2025", "latest rock music 2025", "rock hits 2025"],
+    hiphop: [
+        "new hip hop 2025",
+        "latest rap songs 2025",
+        "trending rap 2025",
+        "viral hip hop 2025",
+    ],
+    edm: [
+        "new edm 2025",
+        "latest edm hits 2025",
+        "trending electronic music 2025",
+    ],
+    jazz: ["new jazz 2025", "modern jazz music", "contemporary jazz 2025"],
+    kpop: [
+        "new kpop 2025",
+        "latest kpop songs 2025",
+        "trending kpop 2025",
+        "viral kpop 2025",
+    ],
+    metal: [
+        "new metal songs 2025",
+        "latest metal music 2025",
+        "metal hits 2025",
+    ],
+    acoustic: [
+        "new acoustic covers 2025",
+        "latest acoustic songs 2025",
+        "trending acoustic 2025",
+    ],
+    classical: [
+        "modern classical music",
+        "contemporary classical",
+        "new classical 2025",
+    ],
+    indie: [
+        "new indie songs 2025",
+        "latest indie music 2025",
+        "trending indie 2025",
+    ],
+    rnb: ["new rnb 2025", "latest r&b songs 2025", "trending rnb 2025"],
+    lofi: [
+        "new lofi 2025",
+        "latest lofi beats 2025",
+        "trending lofi music",
+        "lofi chill 2025",
+    ],
+    poppunk: [
+        "pop punk indonesia terbaru 2025",
+        "lagu pop punk indonesia terbaru",
+        "band pop punk indonesia",
+        "pee wee gaskins",
+        "rocket rockers",
+        "stand here alone",
+        "last child",
+    ],
+    indo: [
+        "lagu indonesia terbaru 2025",
+        "lagu viral indonesia 2025",
+        "trending musik indonesia 2025",
+        "lagu pop indonesia terbaru 2025",
+        "lagu hits indonesia 2025",
+        "chart musik indonesia 2025",
+    ],
+    poprock: [
+        "oasis",
+        "green day",
+        "coldplay",
+        "maroon 5",
+        "onerepublic",
+        "imagine dragons",
+        "the script",
+        "fall out boy",
+        "panic at the disco",
+        "paramore",
+    ],
+};
+
+const genreNames = {
+    poppunk: "Pop Punk Indo",
+    indo: "Indonesia",
+    poprock: "Pop Rock",
 };
 
 const genreChoices = Object.keys(genreQueries).map((g) => ({
-    name: g.charAt(0).toUpperCase() + g.slice(1),
+    name: genreNames[g] || g.charAt(0).toUpperCase() + g.slice(1),
     value: g,
 }));
 
@@ -98,8 +173,21 @@ module.exports = {
             }
             player.data.set("textChannel", interaction.channel);
 
-            // Pick random tracks from results
-            const availableTracks = result.tracks.slice(0, 20);
+            // Filter tracks: max 10 minutes (600000ms) to avoid compilations/mixes
+            const maxDuration = 600000; // 10 minutes
+            const filteredTracks = result.tracks.filter(
+                (t) => t.length && t.length < maxDuration
+            );
+
+            if (!filteredTracks.length) {
+                const embed = new EmbedBuilder()
+                    .setColor("#ed4245")
+                    .setDescription("Tidak bisa menemukan lagu yang sesuai.");
+                return interaction.editReply({ embeds: [embed] });
+            }
+
+            // Pick random tracks from filtered results
+            const availableTracks = filteredTracks.slice(0, 20);
             const shuffled = availableTracks.sort(() => Math.random() - 0.5);
             const selectedTracks = shuffled.slice(0, jumlah);
 
