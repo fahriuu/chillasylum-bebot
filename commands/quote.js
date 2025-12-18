@@ -3,61 +3,61 @@ const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 // Fallback quotes jika API gagal
 const fallbackQuotes = [
     {
-        text: "The only way to do great work is to love what you do.",
-        author: "Steve Jobs",
+        text: "Hidup ini seperti sepeda. Agar tetap seimbang, kamu harus terus bergerak.",
+        author: "Albert Einstein",
     },
     {
-        text: "Innovation distinguishes between a leader and a follower.",
-        author: "Steve Jobs",
-    },
-    { text: "Stay hungry, stay foolish.", author: "Steve Jobs" },
-    {
-        text: "Life is what happens when you're busy making other plans.",
-        author: "John Lennon",
-    },
-    {
-        text: "The future belongs to those who believe in the beauty of their dreams.",
-        author: "Eleanor Roosevelt",
-    },
-    {
-        text: "It is during our darkest moments that we must focus to see the light.",
-        author: "Aristotle",
-    },
-    {
-        text: "Success is not final, failure is not fatal: it is the courage to continue that counts.",
+        text: "Kesuksesan adalah kemampuan untuk pergi dari kegagalan ke kegagalan tanpa kehilangan semangat.",
         author: "Winston Churchill",
     },
     {
-        text: "Believe you can and you're halfway there.",
-        author: "Theodore Roosevelt",
+        text: "Jangan menunggu. Waktunya tidak akan pernah tepat.",
+        author: "Napoleon Hill",
     },
     {
-        text: "The best time to plant a tree was 20 years ago. The second best time is now.",
-        author: "Chinese Proverb",
-    },
-    {
-        text: "Your time is limited, don't waste it living someone else's life.",
+        text: "Satu-satunya cara untuk melakukan pekerjaan hebat adalah mencintai apa yang kamu lakukan.",
         author: "Steve Jobs",
     },
     {
-        text: "In the middle of difficulty lies opportunity.",
+        text: "Masa depan milik mereka yang percaya pada keindahan mimpi-mimpi mereka.",
+        author: "Eleanor Roosevelt",
+    },
+    {
+        text: "Di tengah kesulitan terdapat kesempatan.",
         author: "Albert Einstein",
     },
     {
-        text: "It does not matter how slowly you go as long as you do not stop.",
+        text: "Tidak masalah seberapa lambat kamu berjalan, asalkan kamu tidak berhenti.",
         author: "Confucius",
     },
     {
-        text: "The way to get started is to quit talking and begin doing.",
-        author: "Walt Disney",
+        text: "Percayalah kamu bisa dan kamu sudah setengah jalan.",
+        author: "Theodore Roosevelt",
     },
     {
-        text: "The secret of getting ahead is getting started.",
-        author: "Mark Twain",
+        text: "Waktu terbaik menanam pohon adalah 20 tahun lalu. Waktu terbaik kedua adalah sekarang.",
+        author: "Pepatah Tiongkok",
     },
     {
-        text: "Creativity is intelligence having fun.",
+        text: "Kreativitas adalah kecerdasan yang sedang bersenang-senang.",
         author: "Albert Einstein",
+    },
+    {
+        text: "Jangan biarkan kemarin mengambil terlalu banyak hari ini.",
+        author: "Will Rogers",
+    },
+    { text: "Rahasia untuk maju adalah memulai.", author: "Mark Twain" },
+    {
+        text: "Kegagalan adalah bumbu yang memberi rasa pada kesuksesan.",
+        author: "Truman Capote",
+    },
+    {
+        text: "Hiduplah seolah kamu akan mati besok. Belajarlah seolah kamu akan hidup selamanya.",
+        author: "Mahatma Gandhi",
+    },
+    {
+        text: "Keberanian bukan berarti tidak takut, tapi melangkah meski takut.",
+        author: "Nelson Mandela",
     },
 ];
 
