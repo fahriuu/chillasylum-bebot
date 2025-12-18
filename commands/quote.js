@@ -14,7 +14,13 @@ module.exports = {
             );
             const data = await res.json();
 
-            if (!data || !data.quote) {
+            console.log("Quote API response:", JSON.stringify(data));
+
+            // Handle response format from liupurnomo API
+            const quote = data.text || data.quote || data.content;
+            const author = data.author || "Unknown";
+
+            if (!quote) {
                 const embed = new EmbedBuilder()
                     .setColor("#ed4245")
                     .setDescription("Gagal mendapatkan quote.");
@@ -23,8 +29,8 @@ module.exports = {
 
             const embed = new EmbedBuilder()
                 .setColor("#5865F2")
-                .setDescription(`*"${data.quote}"*`)
-                .setFooter({ text: `— ${data.author || "Unknown"}` });
+                .setDescription(`*"${quote}"*`)
+                .setFooter({ text: `— ${author}` });
 
             return interaction.editReply({ embeds: [embed] });
         } catch (error) {
