@@ -120,7 +120,7 @@ client.on("messageCreate", (message) => {
             const warnings = [
                 `Hei <@${message.author.id}>, tolong jaga omonganmu ya memek`,
                 `<@${message.author.id}> Ehh, mulutnya kaya ga di sekolahin`,
-                `<@${message.author.id}> pepek so asik kentot`,
+                `<@${message.author.id}> pepek so asik kont`,
                 `Sabar <@${message.author.id}>, dek `,
             ];
             const randomWarning =
