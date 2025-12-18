@@ -25,7 +25,11 @@ module.exports = {
         let cleanTitle = current.title
             .replace(/\(.*?\)|\[.*?\]/g, "") // Remove (xxx) and [xxx]
             .replace(/\|.*/g, "") // Remove everything after |
+            .replace(/#\w+/g, "") // Remove hashtags
             .replace(/official\s*(video|audio|mv|music video)?/gi, "")
+            .replace(/feat\.?|ft\.?/gi, "") // Remove feat/ft
+            .replace(/\s*-\s*/g, " ") // Replace - with space
+            .replace(/&/g, " ") // Replace & with space
             .replace(/\s+/g, " ")
             .trim();
 
@@ -35,8 +39,12 @@ module.exports = {
             .replace(/\s+/g, " ")
             .trim();
 
-        // Build search query: "artist trackname"
-        const searchQuery = `${artist} ${cleanTitle}`;
+        // For Spotify tracks, title often has "Song - Artist" format, extract just song name
+        // Also limit to first few words to avoid noise
+        let songName = cleanTitle.split(" ").slice(0, 5).join(" ");
+
+        // Build search query: "songname artist"
+        const searchQuery = `${songName} ${artist}`;
 
         try {
             // Use lrclib.net API (free, better coverage)
