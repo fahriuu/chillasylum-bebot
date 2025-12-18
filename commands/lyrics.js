@@ -21,27 +21,22 @@ module.exports = {
 
         const current = player.queue.current;
 
-        // Clean title - remove cover, lirik, terjemahan, etc
+        // Clean title - remove noise words
         let cleanTitle = current.title
             .replace(/\(.*?\)|\[.*?\]/g, "") // Remove (xxx) and [xxx]
             .replace(/\|.*/g, "") // Remove everything after |
-            .replace(
-                /-.*?(cover|lirik|terjemahan|lyrics|remix|acoustic|live|official|video|audio|mv|music video)/gi,
-                ""
-            ) // Remove - Cover, - Lirik, etc
-            .replace(
-                /cover|lirik|terjemahan|lyrics|bahasa indonesia|indo|remix|acoustic|live|official|video|audio|mv/gi,
-                ""
-            ) // Remove keywords
-            .replace(/\s+/g, " ") // Multiple spaces to single
+            .replace(/official\s*(video|audio|mv|music video)?/gi, "")
+            .replace(/\s+/g, " ")
             .trim();
 
-        // If title has " - " format like "Song - Artist", extract song name
-        if (cleanTitle.includes(" - ")) {
-            cleanTitle = cleanTitle.split(" - ")[0].trim();
-        }
+        // Extract artist from author (channel name)
+        let artist = current.author
+            .replace(/\s*-?\s*(topic|official|vevo|music)$/gi, "")
+            .replace(/\s+/g, " ")
+            .trim();
 
-        const searchQuery = cleanTitle;
+        // Build search query: "artist trackname"
+        const searchQuery = `${artist} ${cleanTitle}`;
 
         try {
             // Use lrclib.net API (free, better coverage)
@@ -60,10 +55,18 @@ module.exports = {
                 return interaction.editReply({ embeds: [embed] });
             }
 
-            // Find first result with lyrics
-            const song = searchData.find(
-                (s) => s.plainLyrics || s.syncedLyrics
+            // Find best match - prioritize matching artist name
+            const artistLower = artist.toLowerCase();
+            let song = searchData.find(
+                (s) =>
+                    (s.plainLyrics || s.syncedLyrics) &&
+                    s.artistName.toLowerCase().includes(artistLower)
             );
+
+            // Fallback to first result with lyrics
+            if (!song) {
+                song = searchData.find((s) => s.plainLyrics || s.syncedLyrics);
+            }
 
             if (!song) {
                 const embed = new EmbedBuilder()
