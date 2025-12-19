@@ -58,7 +58,7 @@ for (const file of eventFiles) {
     }
 }
 
-// Bad words filter (kata kasar Indonesia)
+// Bad words filter (kata kasar Indonesia + English)
 const badWords = [
     "anjing",
     "anjg",
@@ -72,8 +72,6 @@ const badWords = [
     "kntl",
     "memek",
     "mmk",
-    "mbud",
-    "kentot",
     "goblok",
     "goblog",
     "gblk",
@@ -95,12 +93,23 @@ const badWords = [
     "monyet",
     "pepek",
     "ngentot",
-    "najis",
     "ngewe",
     "asu",
     "jancok",
     "jancuk",
     "cok",
+    "bacot",
+    "bcot",
+    "bacod",
+    "fuck",
+    "fak",
+    "fck",
+    "fuk",
+    "shit",
+    "bitch",
+    "ass",
+    "bangke",
+    "bgke",
 ];
 
 // Handle messages
@@ -109,26 +118,19 @@ client.on("messageCreate", (message) => {
 
     const content = message.content.toLowerCase();
 
-    // Check for bad words mentioning bot
-    const mentionsBot =
-        message.mentions.has(client.user) ||
-        content.includes("bot") ||
-        content.includes("bebot");
-
-    if (mentionsBot) {
-        const hasBadWord = badWords.some((word) => content.includes(word));
-        if (hasBadWord) {
-            const warnings = [
+    // Check for bad words (any message)
+    const hasBadWord = badWords.some((word) => content.includes(word));
+    if (hasBadWord) {
+        const warnings = [
                 `Hei <@${message.author.id}>, tolong jaga omonganmu ya memek`,
                 `<@${message.author.id}> Ehh, mulutnya kaya ga di sekolahin`,
                 `<@${message.author.id}> pepek so asik kont`,
                 `Sabar <@${message.author.id}>, dek `,
-            ];
-            const randomWarning =
-                warnings[Math.floor(Math.random() * warnings.length)];
-            message.reply(randomWarning);
-            return;
-        }
+        ];
+        const randomWarning =
+            warnings[Math.floor(Math.random() * warnings.length)];
+        message.reply(randomWarning);
+        return;
     }
 
     // Respon halo
