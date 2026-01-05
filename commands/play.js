@@ -60,6 +60,17 @@ module.exports = {
 
         // Check if bot is already in a different voice channel
         let player = kazagumo.players.get(interaction.guild.id);
+
+        // Clean up invalid/stuck player
+        if (player && !player.voiceId) {
+            try {
+                player.destroy();
+            } catch (e) {
+                // Ignore
+            }
+            player = null;
+        }
+
         if (player && player.voiceId !== voiceChannel.id) {
             const embed = new EmbedBuilder()
                 .setColor("#ed4245")
