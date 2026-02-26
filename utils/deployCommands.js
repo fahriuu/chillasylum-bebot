@@ -2,7 +2,7 @@ const { REST, Routes } = require("discord.js");
 const fs = require("fs");
 const path = require("path");
 
-module.exports = async (client) => {
+module.exports = async (client, targetGuildId = null) => {
     const commandsPath = path.join(__dirname, "..", "commands");
     const commandFiles = fs
         .readdirSync(commandsPath)
@@ -28,24 +28,40 @@ module.exports = async (client) => {
     );
 
     try {
-        // Deploy ke setiap guild (instant update)
-        const guilds = client.guilds.cache;
+        if (targetGuildId) {
+            // Deploy ke guild spesifik
+            const guild = client.guilds.cache.get(targetGuildId);
+            console.log(
+                `\n🔄 Deploy ${commands.length} slash commands ke server: ${guild ? guild.name : targetGuildId}...`
+            );
+            
+            const result = await rest.put(
+                Routes.applicationGuildCommands(client.user.id, targetGuildId),
+                { body: commands }
+            );
+            console.log(
+                `✅ ${result.length} commands deployed ke: ${guild ? guild.name : targetGuildId}`
+            );
+        } else {
+            // Deploy ke semua guild
+            const guilds = client.guilds.cache;
 
-        console.log(
-            `\n🔄 Deploy ${commands.length} slash commands ke ${guilds.size} server...`
-        );
+            console.log(
+                `\n🔄 Deploy ${commands.length} slash commands ke ${guilds.size} server...`
+            );
 
-        for (const [guildId, guild] of guilds) {
-            try {
-                const result = await rest.put(
-                    Routes.applicationGuildCommands(client.user.id, guildId),
-                    { body: commands }
-                );
-                console.log(
-                    `✅ ${result.length} commands deployed ke: ${guild.name}`
-                );
-            } catch (err) {
-                console.error(`❌ Gagal deploy ke ${guild.name}:`, err.message);
+            for (const [guildId, guild] of guilds) {
+                try {
+                    const result = await rest.put(
+                        Routes.applicationGuildCommands(client.user.id, guildId),
+                        { body: commands }
+                    );
+                    console.log(
+                        `✅ ${result.length} commands deployed ke: ${guild.name}`
+                    );
+                } catch (err) {
+                    console.error(`❌ Gagal deploy ke ${guild.name}:`, err.message);
+                }
             }
         }
 
