@@ -60,7 +60,7 @@ module.exports = {
         const embed = new EmbedBuilder()
             .setColor("#5865f2")
             .setDescription(
-                `⏭️ Skipped **${skippedTrack?.title || "Unknown"}**`
+                ` Skipped **${skippedTrack?.title || "Unknown"}**`
             );
 
         if (nextTrack) {

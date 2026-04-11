@@ -324,7 +324,7 @@ module.exports = {
             const embed = new EmbedBuilder()
                 .setColor("#1DB954")
                 .setAuthor({
-                    name: isPlaying ? " Added to Queue" : "🎵 Now Playing",
+                    name: isPlaying ? " Added to Queue" : " Now Playing",
                 })
                 .setTitle(truncate(track.title, 50))
                 .setURL(track.uri)

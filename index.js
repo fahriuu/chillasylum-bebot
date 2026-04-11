@@ -3,7 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const { Client, IntentsBitField, Collection } = require("discord.js");
 const { initLavalink } = require("./utils/lavalink");
-const { AutoPoster } = require("@top-gg/sdk");
+const { Api: TopggApi } = require("@top-gg/sdk");
 
 const client = new Client({
     intents: [
@@ -122,8 +122,9 @@ client.on("messageCreate", (message) => {
         const warnings = [
             `Hei <@${message.author.id}>, tolong jaga omonganmu ya memek`,
             `<@${message.author.id}> Ehh, mulutnya kaya ga di sekolahin`,
-            `<@${message.author.id}> pepek so asik kont`,
+            `<@${message.author.id}> pepek so a6 lo kontol`,
             `Sabar <@${message.author.id}>, dek `,
+            `<@${message.author.id}> so cakep lu kodok`,
         ];
         const randomWarning =
             warnings[Math.floor(Math.random() * warnings.length)];
@@ -185,23 +186,27 @@ process.on("SIGTERM", () => {
 // Init Lavalink
 initLavalink(client);
 
-// Init Top.gg AutoPoster (if token provided)
+// Init Top.gg stat posting (if token provided)
 if (process.env.TOPGG_TOKEN) {
-    try {
-        const autoposter = AutoPoster(process.env.TOPGG_TOKEN, client);
+    const topgg = new TopggApi(process.env.TOPGG_TOKEN);
 
-        autoposter.on("posted", (stats) => {
-            console.log(`✅ Top.gg stats posted: ${stats.serverCount} servers`);
-        });
+    const postTopggStats = async () => {
+        try {
+            await topgg.postStats({
+                serverCount: client.guilds.cache.size,
+            });
+            console.log(`✅ Top.gg stats posted: ${client.guilds.cache.size} servers`);
+        } catch (error) {
+            console.error("❌ Top.gg post stats error:", error.message);
+        }
+    };
 
-        autoposter.on("error", (error) => {
-            console.error("❌ Top.gg AutoPoster error:", error.message);
-        });
-
-        console.log("🔝 Top.gg AutoPoster initialized");
-    } catch (error) {
-        console.error("❌ Failed to initialize Top.gg:", error.message);
-    }
+    // Post stats once bot is ready, then every 30 minutes
+    client.once("clientReady", () => {
+        postTopggStats();
+        setInterval(postTopggStats, 30 * 60 * 1000);
+        console.log("🔝 Top.gg stat poster initialized");
+    });
 } else {
     console.log("⚠️ Top.gg token not found - stats posting disabled");
 }

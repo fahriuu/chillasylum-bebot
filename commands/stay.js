@@ -58,7 +58,7 @@ module.exports = {
         const embed = new EmbedBuilder()
             .setColor("#57F287")
             .setDescription(
-                "✅ Bot akan stay di voice channel dan tidak auto-leave.",
+                "Bot akan stay di voice channel dan tidak auto-leave.",
             );
 
         return interaction.reply({ embeds: [embed] });
