@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const { getKazagumo } = require("../utils/lavalink");
+const { isDeezerUrl, parseDeezerUrl, getDeezerTrack, getDeezerAlbum, getDeezerPlaylist, getPlaylistInfo } = require("../utils/deezer");
 
 // Helper function to check if URL is Spotify
 function isSpotifyUrl(url) {
@@ -289,6 +290,225 @@ module.exports = {
                 }
             }
 
+            // Handle Deezer URL
+            if (isDeezerUrl(query)) {
+                const loadingEmbed = new EmbedBuilder()
+                    .setColor("#A238FF")
+                    .setDescription(" Tunggu sedang mencari lagu dari Deezer...");
+                await interaction.editReply({ embeds: [loadingEmbed] });
+
+                try {
+                    // Try LavaSrc first
+                    const result = await kazagumo.search(query, {
+                        requester: interaction.user,
+                        engine: "deezer",
+                    });
+
+                    if (!result || !result.tracks || result.tracks.length === 0) {
+                        throw new Error("Lavalink tidak support Deezer secara langsung.");
+                    }
+
+                    const isPlaylist = result.tracks.length > 1;
+
+                    if (isPlaylist) {
+                        const startPosition = player.queue.length;
+                        result.tracks.forEach((track) => {
+                            track.source = "deezer";
+                            player.queue.add(track);
+                        });
+
+                        if (!player.playing && !player.paused) {
+                            await player.play();
+                        }
+
+                        const trackList = result.tracks
+                            .slice(0, 10)
+                            .map((t, i) => {
+                                const title = truncate(t.title, 30);
+                                const artist = truncate(t.author, 20);
+                                const queuePos = startPosition + i + 1;
+                                const duration = formatDuration(t.length);
+                                return `\`${String(queuePos).padStart(2, " ")}.\` ${title} • ${artist} \`${duration}\``;
+                            })
+                            .join("\n");
+
+                        const remaining = result.tracks.length - 10;
+                        const moreText = remaining > 0 ? `\n\n\`+${remaining} more tracks\`` : "";
+
+                        const embed = new EmbedBuilder()
+                            .setColor("#A238FF")
+                            .setAuthor({
+                                name: "✅ Added to Queue",
+                                iconURL: "https://cdn-icons-png.flaticon.com/512/5968/5968837.png",
+                            })
+                            .setTitle(result.playlistName || "Deezer Playlist")
+                            .setURL(query)
+                            .setDescription(`${trackList}${moreText}`)
+                            .setThumbnail(result.tracks[0]?.thumbnail)
+                            .setFooter({
+                                text: `${result.tracks.length} tracks • Requested by ${interaction.user.username}`,
+                                iconURL: interaction.user.displayAvatarURL(),
+                            })
+                            .setTimestamp();
+
+                        return interaction.editReply({ embeds: [embed] });
+                    } else {
+                        const track = result.tracks[0];
+                        track.source = "deezer";
+                        player.queue.add(track);
+
+                        const isPlaying = player.playing || player.paused;
+                        if (!isPlaying) {
+                            await player.play();
+                        }
+
+                        const embed = new EmbedBuilder()
+                            .setColor("#A238FF")
+                            .setAuthor({
+                                name: isPlaying ? "Added to Queue" : "Now Playing",
+                                iconURL: "https://cdn-icons-png.flaticon.com/512/5968/5968837.png",
+                            })
+                            .setTitle(truncate(track.title, 50))
+                            .setURL(track.uri)
+                            .setThumbnail(track.thumbnail || null)
+                            .setDescription(`by **${track.author || "Unknown"}**`)
+                            .addFields(
+                                {
+                                    name: "Duration",
+                                    value: `\`${formatDuration(track.length)}\``,
+                                    inline: true,
+                                },
+                                {
+                                    name: "Position",
+                                    value: `\`#${player.queue.length}\``,
+                                    inline: true,
+                                },
+                            )
+                            .setFooter({
+                                text: `Requested by ${interaction.user.username}`,
+                                iconURL: interaction.user.displayAvatarURL(),
+                            })
+                            .setTimestamp();
+
+                        return interaction.editReply({ embeds: [embed] });
+                    }
+                } catch (deezerError) {
+                    // Fallback to Deezer API + YouTube search
+                    console.log("Lavalink Deezer failed, falling back to Deezer API:", deezerError.message);
+                    
+                    const parsed = parseDeezerUrl(query);
+                    if (!parsed) {
+                        const embed = new EmbedBuilder().setColor("#ed4245").setDescription("❌ Link Deezer tidak dapat dibaca.");
+                        return interaction.editReply({ embeds: [embed] });
+                    }
+
+                    if (parsed.type === "track") {
+                        const meta = await getDeezerTrack(parsed.id);
+                        if (!meta) {
+                            const embed = new EmbedBuilder().setColor("#ed4245").setDescription("❌ Gagal mengambil data lagu dari API Deezer.");
+                            return interaction.editReply({ embeds: [embed] });
+                        }
+
+                        const searchResult = await kazagumo.search(meta.query, { requester: interaction.user });
+                        if (!searchResult || !searchResult.tracks.length) {
+                            const embed = new EmbedBuilder().setColor("#ed4245").setDescription("❌ Gagal menemukan audio untuk lagu tersebut di YouTube.");
+                            return interaction.editReply({ embeds: [embed] });
+                        }
+
+                        const track = searchResult.tracks[0];
+                        track.title = meta.title;
+                        track.author = meta.artist;
+                        track.thumbnail = meta.thumbnail;
+                        track.source = "deezer";
+                        track.uri = meta.uri;
+
+                        player.queue.add(track);
+
+                        const isPlaying = player.playing || player.paused;
+                        if (!isPlaying) await player.play();
+
+                        const embed = new EmbedBuilder()
+                            .setColor("#A238FF")
+                            .setAuthor({
+                                name: isPlaying ? "Added to Queue" : "Now Playing",
+                                iconURL: "https://cdn-icons-png.flaticon.com/512/5968/5968837.png"
+                            })
+                            .setTitle(truncate(track.title, 50))
+                            .setURL(track.uri)
+                            .setThumbnail(track.thumbnail || null)
+                            .setDescription(`by **${track.author || "Unknown"}**`)
+                            .addFields(
+                                { name: "Duration", value: `\`${meta.duration}\``, inline: true },
+                                { name: "Position", value: `\`#${player.queue.length}\``, inline: true }
+                            )
+                            .setFooter({ text: `Requested by ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL() })
+                            .setTimestamp();
+
+                        return interaction.editReply({ embeds: [embed] });
+                    } else {
+                        const tracks = parsed.type === "playlist" ? await getDeezerPlaylist(parsed.id) : await getDeezerAlbum(parsed.id);
+                        const listInfo = await getPlaylistInfo(parsed.id, parsed.type);
+
+                        if (!tracks || tracks.length === 0) {
+                            const embed = new EmbedBuilder().setColor("#ed4245").setDescription("❌ Gagal mengambil data playlist/album dari API Deezer.");
+                            return interaction.editReply({ embeds: [embed] });
+                        }
+
+                        const limit = Math.min(tracks.length, 10);
+                        const resolvedTracks = [];
+                        
+                        const msgEmbed = new EmbedBuilder().setColor("#A238FF").setDescription(`🔍 Sedang mencocokkan ${limit} lagu dari Deezer ke YouTube...`);
+                        await interaction.editReply({ embeds: [msgEmbed] });
+
+                        for (let i = 0; i < limit; i++) {
+                            const meta = tracks[i];
+                            const res = await kazagumo.search(meta.query, { requester: interaction.user });
+                            if (res && res.tracks.length) {
+                                const trk = res.tracks[0];
+                                trk.title = meta.title;
+                                trk.author = meta.artist;
+                                trk.thumbnail = meta.thumbnail;
+                                trk.uri = meta.uri;
+                                trk.source = "deezer";
+                                resolvedTracks.push(trk);
+                                player.queue.add(trk);
+                            }
+                        }
+
+                        if (!player.playing && !player.paused && resolvedTracks.length > 0) {
+                            await player.play();
+                        }
+
+                        const startPosition = player.queue.length - resolvedTracks.length;
+                        const trackList = resolvedTracks.map((t, i) => {
+                            const title = truncate(t.title, 30);
+                            const artist = truncate(t.author, 20);
+                            const queuePos = startPosition + i + 1;
+                            const duration = formatDuration(t.length);
+                            return `\`${String(queuePos).padStart(2, " ")}.\` ${title} • ${artist} \`${duration}\``;
+                        }).join("\n");
+
+                        const remaining = tracks.length - resolvedTracks.length;
+                        const moreText = remaining > 0 ? `\n\n\`+${remaining} lagu lainnya tidak dimuat untuk mencegah lag.\`` : "";
+
+                        const embed = new EmbedBuilder()
+                            .setColor("#A238FF")
+                            .setAuthor({
+                                name: "✅ Added to Queue",
+                                iconURL: "https://cdn-icons-png.flaticon.com/512/5968/5968837.png"
+                            })
+                            .setTitle(listInfo ? listInfo.name : "Deezer Playlist")
+                            .setURL(query)
+                            .setDescription(`${trackList}${moreText}`)
+                            .setThumbnail(listInfo ? listInfo.thumbnail : tracks[0].thumbnail)
+                            .setFooter({ text: `${resolvedTracks.length} tracks loaded • Requested by ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL() })
+                            .setTimestamp();
+
+                        return interaction.editReply({ embeds: [embed] });
+                    }
+                }
+            }
+
             // Handle regular search
             const result = await kazagumo.search(query, {
                 requester: interaction.user,
@@ -307,6 +527,8 @@ module.exports = {
                 track.source = "youtube";
             } else if (query.includes("spotify.com")) {
                 track.source = "spotify";
+            } else if (query.includes("deezer.com") || query.includes("deezer.page.link")) {
+                track.source = "deezer";
             } else {
                 track.source = "youtube"; // Default search goes to YouTube
             }

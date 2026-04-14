@@ -3,6 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const { Client, IntentsBitField, Collection } = require("discord.js");
 const { initLavalink } = require("./utils/lavalink");
+const { askQwen } = require("./utils/ai");
 const { Api: TopggApi } = require("@top-gg/sdk");
 
 const client = new Client({
@@ -117,7 +118,9 @@ client.on("messageCreate", (message) => {
     const content = message.content.toLowerCase();
 
     // Check for bad words (any message)
-    const hasBadWord = badWords.some((word) => content.includes(word));
+    // Gunakan word boundary agar tidak salah deteksi kata normal (misal "panjang" kena "anj")
+    const words = content.replace(/[^\w\s]/g, '').split(/\s+/);
+    const hasBadWord = words.some((word) => badWords.includes(word));
     if (hasBadWord) {
         const warnings = [
             `Hei <@${message.author.id}>, tolong jaga omonganmu ya memek`,
@@ -132,11 +135,35 @@ client.on("messageCreate", (message) => {
         return;
     }
 
+    // pertanyaan siapa owner atau yang punya server
+    const hasOwner = words.some((word) => word === "owner") || content.includes("yang punya");
+    if (hasOwner) {
+        if (message.guild) {
+            message.reply(`Owner server (Discord) ini adalah King <@${message.guild.ownerId}> 👑`);
+        } else {
+            message.reply("Owner nya afk jir menghilang wkwkwk");
+        }
+        return;
+    }
+
+
     // Respon halo
     const haloKeywords = ["halo", "hai", "hello", "hi", "hey"];
     if (haloKeywords.some((word) => content.includes(word))) {
         message.reply(`👋 Halo <@${message.author.id}>!`);
         return;
+    }
+
+    // AI Chat respon jika bot di-tag
+    if (message.mentions.has(client.user) && !message.mentions.everyone) {
+        const question = message.content.replace(new RegExp(`<@!?${client.user.id}>`, 'g'), '').trim();
+        if (question.length > 0) {
+            message.channel.sendTyping();
+            askQwen(question).then(replyText => {
+                message.reply(replyText);
+            });
+            return;
+        }
     }
 
     // Handle prefix commands

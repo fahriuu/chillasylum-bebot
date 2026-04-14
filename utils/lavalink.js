@@ -175,6 +175,8 @@ function initLavalink(client) {
             "https://open.spotifycdn.com/cdn/images/favicon32.b64ecc03.png";
         const youtubeIcon =
             "https://www.youtube.com/s/desktop/f506bd45/img/favicon_32.png";
+        const deezerIcon =
+            "https://cdn-icons-png.flaticon.com/512/5968/5968837.png";
 
         // Check source from track (set in play.js) or fallback to URI detection
         const trackSource = track.source || "";
@@ -186,6 +188,9 @@ function initLavalink(client) {
         if (trackSource === "spotify" || uri.includes("spotify.com")) {
             sourceIcon = spotifyIcon;
             sourceColor = "#1DB954";
+        } else if (trackSource === "deezer" || uri.includes("deezer.com")) {
+            sourceIcon = deezerIcon;
+            sourceColor = "#A238FF";
         }
 
         const embed = new EmbedBuilder()
