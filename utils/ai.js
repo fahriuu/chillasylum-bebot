@@ -7,7 +7,7 @@ const openai = new OpenAI({
 
 async function askQwen(question) {
     if (!process.env.QWEN_API_KEY) {
-        return "⚠️ QWEN_API_KEY belum di-setup di file .env!";
+        return " QWEN_API_KEY belum di-setup di file .env!";
     }
 
     try {
@@ -16,7 +16,7 @@ async function askQwen(question) {
             messages: [
                 { 
                     role: "system", 
-                    content: "Kamu adalah asisten Discord bot yang ramah bernama Bebot. Jawab pertanyaan user dengan ringkas dan jelas dalam bahasa Indonesia." 
+                    content: "Kamu adalah asisten Discord bot yang ramah bernama Bebot. Jawablah dengan sangat singkat, jelas, dan santai tanpa penjelasan bertele-tele." 
                 },
                 { 
                     role: "user", 
