@@ -1,7 +1,7 @@
 require("dotenv").config();
 const fs = require("fs");
 const path = require("path");
-const { Client, IntentsBitField, Collection } = require("discord.js");
+const { Client, IntentsBitField, Collection, EmbedBuilder } = require("discord.js");
 const { initLavalink } = require("./utils/lavalink");
 const { askQwen } = require("./utils/ai");
 const { Api: TopggApi } = require("@top-gg/sdk");
@@ -116,6 +116,67 @@ client.on("messageCreate", (message) => {
     if (message.author.bot) return;
 
     const content = message.content.toLowerCase();
+
+    // Anti-scam / phishing filter
+    const scamKeywords = [
+        "free nitro",
+        "bisa dapat nitro",
+        "discord nitro gratis",
+        "steam discord",
+        "free robux",
+        "free crypto",
+        "crypto casino",
+        "withdrawal success",
+        "activate code",
+        "airdrop",
+        "claim your reward",
+        "discord.gift/"
+    ];
+    
+    const suspiciousWords = ["crypto", "usdt", "mrbeast", "mr beast", "casino", "giveaway", "claim", "bonus", "free", "win", "reward"];
+    const hasLink = content.includes("http://") || content.includes("https://") || content.includes("discord.gg/");
+    
+    let suspiciousScore = 0;
+    suspiciousWords.forEach(word => {
+        // gunakan \b agar exact match jika memungkinkan, tapi indexOf sudah cukup
+        if (content.includes(word)) suspiciousScore++;
+    });
+
+    // Jika mengandung phrase scam yg PASTI jelas, atau jika mengirim link/@everyone dan ada 2+ kata mencurigakan
+    const isDirectScam = scamKeywords.some(phrase => content.includes(phrase));
+    const isSusScam = (hasLink || content.includes("@everyone") || content.includes("@here")) && suspiciousScore >= 2;
+
+    if (isDirectScam || isSusScam) {
+        message.delete().catch(err => console.error("Gagal hapus pesan scam:", err));
+        message.channel.send(`🚫 <@${message.author.id}>, pesan kamu dihapus karena terdeteksi sebagai indikasi **Scam/Phishing/Spam**!`).then(msg => {
+            setTimeout(() => msg.delete().catch(() => {}), 7000); // Hapus peringatan setelah 7 detik
+        });
+
+        // Log ke channel logs/mod-logs
+        if (message.guild) {
+            const logChannel = message.guild.channels.cache.find(c => 
+                c.name === "mod-logs" || c.name === "logs" || c.name === "server-logs"
+            );
+            if (logChannel) {
+                let msgContent = message.content || "[Hanya Attachment/Embed]";
+                if (msgContent.length > 1024) msgContent = msgContent.substring(0, 1021) + "...";
+
+                const embed = new EmbedBuilder()
+                    .setTitle("🚨 Scam/Spam Terdeteksi & Dihapus")
+                    .setColor("#FF0000")
+                    .addFields(
+                        { name: "Pelaku", value: `${message.author} (${message.author.tag})`, inline: true },
+                        { name: "Lokasi (Channel)", value: `${message.channel}`, inline: true },
+                        { name: "Isi Pesan", value: msgContent }
+                    )
+                    .setTimestamp();
+                
+                logChannel.send({ embeds: [embed] }).catch(console.error);
+            }
+        }
+
+        return;
+    }
 
     // Check for bad words (any message)
     // Gunakan word boundary agar tidak salah deteksi kata normal (misal "panjang" kena "anj")

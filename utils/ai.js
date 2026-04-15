@@ -12,16 +12,17 @@ async function askQwen(question) {
 
     try {
         const completion = await openai.chat.completions.create({
-            model: "qwen3-max", 
+            model: "Qwen3.5-Plus",
             messages: [
-                { 
-                    role: "system", 
-                    content: "Kamu adalah asisten Discord bot yang ramah bernama Bebot. Jawablah dengan sangat singkat, jelas, dan santai tanpa penjelasan bertele-tele." 
+                {
+                    role: "system",
+                    content:
+                        "Kamu adalah asisten Discord bot yang ramah bernama Bebot. Jawablah dengan sangat singkat, jelas, dan santai tanpa penjelasan bertele-tele.",
                 },
-                { 
-                    role: "user", 
-                    content: question 
-                }
+                {
+                    role: "user",
+                    content: question,
+                },
             ],
         });
 
