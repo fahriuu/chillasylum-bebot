@@ -260,7 +260,7 @@ module.exports = {
                                 },
                                 {
                                     name: "Position",
-                                    value: `\`#${player.queue.length}\``,
+                                    value: `\`#${player.queue.length + 1}\``,
                                     inline: true,
                                 },
                             )
@@ -380,7 +380,7 @@ module.exports = {
                                 },
                                 {
                                     name: "Position",
-                                    value: `\`#${player.queue.length}\``,
+                                    value: `\`#${player.queue.length + 1}\``,
                                     inline: true,
                                 },
                             )
@@ -439,7 +439,7 @@ module.exports = {
                             .setDescription(`by **${track.author || "Unknown"}**`)
                             .addFields(
                                 { name: "Duration", value: `\`${meta.duration}\``, inline: true },
-                                { name: "Position", value: `\`#${player.queue.length}\``, inline: true }
+                                { name: "Position", value: `\`#${player.queue.length + 1}\``, inline: true }
                             )
                             .setFooter({ text: `Requested by ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL() })
                             .setTimestamp();
@@ -560,7 +560,7 @@ module.exports = {
                     },
                     {
                         name: "Position",
-                        value: `\`#${player.queue.length}\``,
+                        value: `\`#${player.queue.length + 1}\``,
                         inline: true,
                     },
                 )
