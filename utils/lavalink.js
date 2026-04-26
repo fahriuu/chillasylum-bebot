@@ -32,16 +32,16 @@ if (nodes.length === 0) {
     );
     nodes.push(
         {
-            name: "Lavalink-Main",
+            name: "Serenetia",
             url: "lavalinkv4.serenetia.com:443",
-            auth: "https://dsc.gg/ajidevserver",
+            auth: "https://seretia.link/discord",
             secure: true,
         },
         {
-            name: "Lavalink-Fallback",
-            url: "lavalinkv4.serenetia.com:80",
-            auth: "https://dsc.gg/ajidevserver",
-            secure: false,
+            name: "Jirayu",
+            url: "lavalink.jirayu.net:443",
+            auth: "youshallnotpass",
+            secure: true,
         },
     );
 }

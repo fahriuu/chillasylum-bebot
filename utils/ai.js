@@ -1,17 +1,26 @@
 const { OpenAI } = require("openai");
 
-const openai = new OpenAI({
-    apiKey: process.env.QWEN_API_KEY,
-    baseURL: "https://api.mulerouter.ai/vendors/openai/v1",
-});
+let openai = null;
+
+function getOpenAIClient() {
+    if (!openai && process.env.QWEN_API_KEY) {
+        openai = new OpenAI({
+            apiKey: process.env.QWEN_API_KEY,
+            baseURL: "https://api.mulerouter.ai/vendors/openai/v1",
+        });
+    }
+    return openai;
+}
 
 async function askQwen(question) {
     if (!process.env.QWEN_API_KEY) {
-        return " QWEN_API_KEY belum di-setup di file .env!";
+        return "⚠️ QWEN_API_KEY belum di-setup di file .env!";
     }
 
+    const client = getOpenAIClient();
+
     try {
-        const completion = await openai.chat.completions.create({
+        const completion = await client.chat.completions.create({
             model: "Qwen3.5-Plus",
             messages: [
                 {
