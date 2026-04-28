@@ -277,6 +277,26 @@ client.on("error", (error) => {
 });
 
 process.on("unhandledRejection", (reason) => {
+    // Gracefully handle Lavalink rate limit (429) errors
+    if (reason && (reason.status === 429 || reason.code === 429)) {
+        console.warn(
+            `⚠️ Lavalink rate limited (429) on ${reason.path || "unknown path"} — suppressed to prevent crash`,
+        );
+        return;
+    }
+
+    // Gracefully handle other Lavalink REST errors (e.g. node temporarily unavailable)
+    if (
+        reason &&
+        reason.constructor?.name === "RestError" &&
+        reason.status >= 400
+    ) {
+        console.warn(
+            `⚠️ Lavalink REST error (${reason.status}) on ${reason.path || "unknown path"}: ${reason.error || reason.message}`,
+        );
+        return;
+    }
+
     console.error("Unhandled Rejection:", reason);
 });
 

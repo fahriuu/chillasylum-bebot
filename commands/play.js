@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
+const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
 const { getKazagumo } = require("../utils/lavalink");
 const { isDeezerUrl, parseDeezerUrl, getDeezerTrack, getDeezerAlbum, getDeezerPlaylist, getPlaylistInfo } = require("../utils/deezer");
 
@@ -23,6 +23,77 @@ function formatDuration(ms) {
             .padStart(2, "0")}`;
     }
     return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
+
+// Helper: send paginated playlist embed with scroll buttons
+async function sendPaginatedPlaylist(interaction, tracks, options) {
+    const { color, iconURL, playlistName, url } = options;
+    const perPage = 10;
+    const totalDuration = tracks.reduce((acc, t) => acc + (t.length || 0), 0);
+    const totalDurStr = formatDuration(totalDuration);
+    const totalPages = Math.ceil(tracks.length / perPage);
+    let page = 0;
+    const uid = Date.now().toString(36);
+
+    function buildEmbed(p) {
+        const start = p * perPage;
+        const list = tracks.slice(start, start + perPage)
+            .map((t, i) => {
+                const n = start + i + 1;
+                const title = truncate(t.title, 35);
+                const artist = truncate(t.author, 20);
+                const dur = formatDuration(t.length);
+                return `\`${String(n).padStart(2, " ")}.\` **${title}**\n\u3000   ${artist} \u2022 \`${dur}\``;
+            }).join("\n");
+
+        return new EmbedBuilder()
+            .setColor(color)
+            .setAuthor({ name: "\u2705 Added to Queue", iconURL })
+            .setTitle(playlistName)
+            .setURL(url)
+            .setDescription(`\ud83c\udfb5 **${tracks.length}** tracks \u2022 \u23f1\ufe0f **${totalDurStr}**\n\n${list}`)
+            .setThumbnail(tracks[0]?.thumbnail || null)
+            .setFooter({
+                text: `Page ${p + 1}/${totalPages} \u2022 Requested by ${interaction.user.username}`,
+                iconURL: interaction.user.displayAvatarURL(),
+            })
+            .setTimestamp();
+    }
+
+    function buildButtons(p) {
+        return new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId(`pl_first_${uid}`).setEmoji("\u23ee\ufe0f").setStyle(ButtonStyle.Secondary).setDisabled(p === 0),
+            new ButtonBuilder().setCustomId(`pl_prev_${uid}`).setEmoji("\u25c0\ufe0f").setStyle(ButtonStyle.Secondary).setDisabled(p === 0),
+            new ButtonBuilder().setCustomId(`pl_info_${uid}`).setLabel(`${p + 1} / ${totalPages}`).setStyle(ButtonStyle.Primary).setDisabled(true),
+            new ButtonBuilder().setCustomId(`pl_next_${uid}`).setEmoji("\u25b6\ufe0f").setStyle(ButtonStyle.Secondary).setDisabled(p >= totalPages - 1),
+            new ButtonBuilder().setCustomId(`pl_last_${uid}`).setEmoji("\u23ed\ufe0f").setStyle(ButtonStyle.Secondary).setDisabled(p >= totalPages - 1),
+        );
+    }
+
+    const components = totalPages > 1 ? [buildButtons(page)] : [];
+    const reply = await interaction.editReply({ embeds: [buildEmbed(page)], components });
+
+    if (totalPages > 1) {
+        const collector = reply.createMessageComponentCollector({
+            filter: (btn) => btn.customId.endsWith(uid),
+            time: 120_000,
+        });
+
+        collector.on("collect", async (btn) => {
+            if (btn.user.id !== interaction.user.id) {
+                return btn.reply({ content: "\u274c Hanya yang request yang bisa scroll!", ephemeral: true });
+            }
+            if (btn.customId.startsWith("pl_first")) page = 0;
+            else if (btn.customId.startsWith("pl_prev")) page = Math.max(0, page - 1);
+            else if (btn.customId.startsWith("pl_next")) page = Math.min(totalPages - 1, page + 1);
+            else if (btn.customId.startsWith("pl_last")) page = totalPages - 1;
+            await btn.update({ embeds: [buildEmbed(page)], components: [buildButtons(page)] });
+        });
+
+        collector.on("end", async () => {
+            try { await interaction.editReply({ components: [] }); } catch (e) { /* ignored */ }
+        });
+    }
 }
 
 // Helper: create player with retry (handles Bad Request from unstable nodes)
@@ -179,8 +250,6 @@ module.exports = {
                     const isPlaylist = result.tracks.length > 1;
 
                     if (isPlaylist) {
-                        // Add all tracks
-                        const startPosition = player.queue.length;
                         result.tracks.forEach((track) => {
                             track.source = "spotify";
                             player.queue.add(track);
@@ -190,42 +259,12 @@ module.exports = {
                             await player.play();
                         }
 
-                        // Build track list
-                        const trackList = result.tracks
-                            .slice(0, 10)
-                            .map((t, i) => {
-                                const title = truncate(t.title, 30);
-                                const artist = truncate(t.author, 20);
-                                const queuePos = startPosition + i + 1;
-                                const duration = formatDuration(t.length);
-                                return `\`${String(queuePos).padStart(2, " ")}.\` ${title} • ${artist} \`${duration}\``;
-                            })
-                            .join("\n");
-
-                        const remaining = result.tracks.length - 10;
-                        const moreText =
-                            remaining > 0
-                                ? `\n\n\`+${remaining} more tracks\``
-                                : "";
-
-                        const embed = new EmbedBuilder()
-                            .setColor("#1DB954")
-                            .setAuthor({
-                                name: "✅ Added to Queue",
-                                iconURL:
-                                    "https://open.spotifycdn.com/cdn/images/favicon32.b64ecc03.png",
-                            })
-                            .setTitle(result.playlistName || "Spotify Playlist")
-                            .setURL(query)
-                            .setDescription(`${trackList}${moreText}`)
-                            .setThumbnail(result.tracks[0]?.thumbnail)
-                            .setFooter({
-                                text: `${result.tracks.length} tracks • Requested by ${interaction.user.username}`,
-                                iconURL: interaction.user.displayAvatarURL(),
-                            })
-                            .setTimestamp();
-
-                        return interaction.editReply({ embeds: [embed] });
+                        return sendPaginatedPlaylist(interaction, result.tracks, {
+                            color: "#1DB954",
+                            iconURL: "https://open.spotifycdn.com/cdn/images/favicon32.b64ecc03.png",
+                            playlistName: result.playlistName || "Spotify Playlist",
+                            url: query,
+                        });
                     } else {
                         // Single track
                         const track = result.tracks[0];
@@ -311,7 +350,6 @@ module.exports = {
                     const isPlaylist = result.tracks.length > 1;
 
                     if (isPlaylist) {
-                        const startPosition = player.queue.length;
                         result.tracks.forEach((track) => {
                             track.source = "deezer";
                             player.queue.add(track);
@@ -321,37 +359,12 @@ module.exports = {
                             await player.play();
                         }
 
-                        const trackList = result.tracks
-                            .slice(0, 10)
-                            .map((t, i) => {
-                                const title = truncate(t.title, 30);
-                                const artist = truncate(t.author, 20);
-                                const queuePos = startPosition + i + 1;
-                                const duration = formatDuration(t.length);
-                                return `\`${String(queuePos).padStart(2, " ")}.\` ${title} • ${artist} \`${duration}\``;
-                            })
-                            .join("\n");
-
-                        const remaining = result.tracks.length - 10;
-                        const moreText = remaining > 0 ? `\n\n\`+${remaining} more tracks\`` : "";
-
-                        const embed = new EmbedBuilder()
-                            .setColor("#A238FF")
-                            .setAuthor({
-                                name: "✅ Added to Queue",
-                                iconURL: "https://cdn-icons-png.flaticon.com/512/5968/5968837.png",
-                            })
-                            .setTitle(result.playlistName || "Deezer Playlist")
-                            .setURL(query)
-                            .setDescription(`${trackList}${moreText}`)
-                            .setThumbnail(result.tracks[0]?.thumbnail)
-                            .setFooter({
-                                text: `${result.tracks.length} tracks • Requested by ${interaction.user.username}`,
-                                iconURL: interaction.user.displayAvatarURL(),
-                            })
-                            .setTimestamp();
-
-                        return interaction.editReply({ embeds: [embed] });
+                        return sendPaginatedPlaylist(interaction, result.tracks, {
+                            color: "#A238FF",
+                            iconURL: "https://cdn-icons-png.flaticon.com/512/5968/5968837.png",
+                            playlistName: result.playlistName || "Deezer Playlist",
+                            url: query,
+                        });
                     } else {
                         const track = result.tracks[0];
                         track.source = "deezer";
@@ -605,6 +618,14 @@ module.exports = {
             ) {
                 errorMsg =
                     "Server musik menolak request (Bad Request). Coba lagi dalam beberapa detik.";
+            } else if (
+                error?.status === 429 ||
+                errStr.includes("429") ||
+                errStr.includes("rate limit") ||
+                errStr.includes("too many requests")
+            ) {
+                errorMsg =
+                    "Server musik sedang rate limited (terlalu banyak request). Tunggu beberapa detik lalu coba lagi.";
             } else if (
                 errStr.includes("4xx") ||
                 errStr.includes("forbidden") ||

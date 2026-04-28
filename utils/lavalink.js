@@ -82,6 +82,45 @@ async function safeSend(channel, embed) {
     }
 }
 
+// Patch Shoukaku node REST to handle rate limits (429) with exponential backoff
+function patchNodeRest(node, nodeName) {
+    if (!node || !node.rest || node.rest._rateLimitPatched) return;
+
+    const originalFetch = node.rest.fetch.bind(node.rest);
+    const MAX_RETRIES = 3;
+
+    node.rest.fetch = async function (...args) {
+        let lastError;
+        for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+            try {
+                return await originalFetch(...args);
+            } catch (error) {
+                lastError = error;
+                if (error.status === 429) {
+                    const delay =
+                        Math.pow(2, attempt) * 1000 +
+                        Math.random() * 500;
+                    console.warn(
+                        `⚠️ [${nodeName}] Rate limited (429) on ${error.path || "unknown"}, retrying in ${Math.round(delay)}ms (attempt ${attempt + 1}/${MAX_RETRIES})`,
+                    );
+                    await new Promise((r) => setTimeout(r, delay));
+                    continue;
+                }
+                // Not a 429 — rethrow immediately
+                throw error;
+            }
+        }
+        // All retries exhausted — log and suppress to prevent crash
+        console.error(
+            `❌ [${nodeName}] Rate limit retries exhausted after ${MAX_RETRIES} attempts on ${lastError?.path || "unknown"}. Suppressing to prevent crash.`,
+        );
+        return null;
+    };
+
+    node.rest._rateLimitPatched = true;
+    console.log(`🛡️ Rate-limit handler patched for node "${nodeName}"`);
+}
+
 function initLavalink(client) {
     kazagumo = new Kazagumo(
         {
@@ -108,17 +147,76 @@ function initLavalink(client) {
         },
     );
 
-    // Player end - just log, Kazagumo handles auto-play automatically
+    // Cooldown tracker for "Started playing" embeds (prevents spam during cascade skips)
+    const playerStartCooldowns = new Map(); // guildId -> { trackUri, timestamp }
+
+    // Player end - detect cascade failures and handle gracefully
     kazagumo.on("playerEnd", (player, endedTrack, reason) => {
         const trackTitle = endedTrack?.title || "Unknown";
         const endReason = reason || "finished";
         console.log(
             `⏹️ Track ended: ${trackTitle}, Reason: ${endReason}, Queue: ${player.queue.length}`,
         );
+
+        // Detect rapid cascade failures (loadFailed, error, etc.)
+        // If a track "ends" almost immediately (<3 seconds), it likely failed due to rate limiting
+        const guildId = player.guildId;
+        const lastStart = playerStartCooldowns.get(guildId);
+
+        if (
+            lastStart &&
+            Date.now() - lastStart.timestamp < 3000 &&
+            (endReason === "loadFailed" ||
+                endReason === "cleanup" ||
+                endReason === "error")
+        ) {
+            console.warn(
+                `⚠️ Track "${trackTitle}" failed almost immediately (${endReason}). ` +
+                    `Pausing auto-play for 3s to avoid cascade.`,
+            );
+
+            // Re-queue the failed track at the front so it can retry later
+            if (endedTrack) {
+                player.queue.unshift(endedTrack);
+            }
+
+            // Pause auto-play briefly to let rate limit cool down
+            // We do this by temporarily stopping, then restarting after delay
+            setTimeout(async () => {
+                try {
+                    if (
+                        player.queue.length > 0 &&
+                        !player.playing &&
+                        !player.paused
+                    ) {
+                        console.log(
+                            `🔄 Resuming playback after cascade cooldown for guild ${guildId}`,
+                        );
+                        await player.play();
+                    }
+                } catch (e) {
+                    console.error(
+                        "Failed to resume after cascade cooldown:",
+                        e.message,
+                    );
+                }
+            }, 3000);
+
+            // Return early to prevent Kazagumo from auto-playing the next track immediately
+            return;
+        }
     });
 
     // Node events
     kazagumo.shoukaku.on("ready", async (name, reconnected) => {
+        console.log(
+            `✅ Lavalink node "${name}" ${reconnected ? "reconnected" : "connected"}`,
+        );
+
+        // Patch REST rate-limit handler for this node
+        const node = kazagumo.shoukaku.nodes.get(name);
+        patchNodeRest(node, name);
+
         // Check if node supports Spotify (LavaSrc plugin)
         if (!reconnected) {
             try {
@@ -158,12 +256,38 @@ function initLavalink(client) {
         );
     });
 
-    // Player start - Now Playing log
+    // Player start - Now Playing with cooldown to prevent spam
     kazagumo.on("playerStart", (player, track) => {
         console.log(`Bermain: ${track?.title || "Unknown"}`);
 
         const textChannel = player.data.get("textChannel");
         if (!textChannel || !track) return;
+
+        // Debounce: minimum 5 second gap between "Started playing" embeds per guild
+        // This prevents spam when tracks rapidly fail/skip due to rate limiting
+        const guildId = player.guildId;
+        const now = Date.now();
+        const lastInfo = playerStartCooldowns.get(guildId);
+
+        if (lastInfo) {
+            const timeSince = now - lastInfo.timestamp;
+            // Skip embed if same track or less than 5 seconds since last embed
+            if (lastInfo.trackUri === (track.uri || track.title) || timeSince < 5000) {
+                console.log(
+                    `⏳ Skipping "Started playing" embed for "${track.title}" (cooldown: ${Math.round((5000 - timeSince) / 1000)}s remaining)`,
+                );
+                playerStartCooldowns.set(guildId, {
+                    trackUri: track.uri || track.title,
+                    timestamp: now,
+                });
+                return;
+            }
+        }
+
+        playerStartCooldowns.set(guildId, {
+            trackUri: track.uri || track.title,
+            timestamp: now,
+        });
 
         const title = truncate(track.title, 45);
         const artist = truncate(track.author, 25);
@@ -269,6 +393,16 @@ function initLavalink(client) {
 
     // Player error
     kazagumo.on("playerError", (player, error) => {
+        const isRateLimit = error?.status === 429 || error?.message?.includes("429");
+
+        if (isRateLimit) {
+            console.warn(
+                `⚠️ Player rate limited for guild ${player.guildId} — will retry automatically`,
+            );
+            // Don't send error message for rate limits, they're retried silently
+            return;
+        }
+
         console.error("Player error:", error);
 
         const textChannel = player.data.get("textChannel");
