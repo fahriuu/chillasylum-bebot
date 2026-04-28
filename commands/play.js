@@ -226,10 +226,22 @@ module.exports = {
 
                 try {
                     // Try to load directly with Lavalink (LavaSrc plugin handles Spotify)
-                    const result = await kazagumo.search(query, {
+                    let result = await kazagumo.search(query, {
                         requester: interaction.user,
                         engine: "spotify",
                     });
+
+                    // If Spotify engine returned nothing, retry without engine restriction (auto-fallback)
+                    if (
+                        !result ||
+                        !result.tracks ||
+                        result.tracks.length === 0
+                    ) {
+                        console.log("Spotify search returned 0 results, retrying without engine restriction...");
+                        result = await kazagumo.search(query, {
+                            requester: interaction.user,
+                        });
+                    }
 
                     if (
                         !result ||
