@@ -121,6 +121,9 @@ function patchNodeRest(node, nodeName) {
     console.log(`🛡️ Rate-limit handler patched for node "${nodeName}"`);
 }
 
+// Track which nodes support Spotify (LavaSrc plugin)
+const spotifyNodes = new Set();
+
 function initLavalink(client) {
     kazagumo = new Kazagumo(
         {
@@ -139,10 +142,14 @@ function initLavalink(client) {
             restTimeout: 30,
             voiceConnectionTimeout: 15,
             nodeResolver: (nodes) => {
-                // Pick the connected node with least penalties
-                return [...nodes.values()]
-                    .filter((node) => node.state === 1) // CONNECTED
-                    .sort((a, b) => a.penalties - b.penalties)[0];
+                // Pick connected nodes, prefer Spotify-capable ones
+                const connected = [...nodes.values()].filter((node) => node.state === 1);
+                if (connected.length === 0) return null;
+
+                // Prefer Spotify-capable nodes so Spotify searches don't route to incompatible nodes
+                const spotifyCapable = connected.filter((n) => spotifyNodes.has(n.name));
+                const candidates = spotifyCapable.length > 0 ? spotifyCapable : connected;
+                return candidates.sort((a, b) => a.penalties - b.penalties)[0];
             },
         },
     );
@@ -225,12 +232,18 @@ function initLavalink(client) {
                     { engine: "spotify" },
                 );
                 if (testResult.tracks.length > 0) {
+                    spotifyNodes.add(name);
+                    console.log(
+                        `🟢 Node "${name}" supports Spotify (LavaSrc)`,
+                    );
                 } else {
+                    spotifyNodes.delete(name);
                     console.log(
                         `⚠️ Node "${name}" does NOT support Spotify directly`,
                     );
                 }
             } catch (e) {
+                spotifyNodes.delete(name);
                 console.log(
                     `⚠️ Node "${name}" does NOT support Spotify directly - using YouTube fallback`,
                 );
@@ -248,12 +261,14 @@ function initLavalink(client) {
                 reason || "No reason"
             }`,
         );
+        spotifyNodes.delete(name);
     });
 
     kazagumo.shoukaku.on("disconnect", (name, players, moved) => {
         console.log(
             `🔌 Lavalink node "${name}" disconnected. Players: ${players.length}, Moved: ${moved}`,
         );
+        spotifyNodes.delete(name);
     });
 
     // Player start - Now Playing with cooldown to prevent spam
