@@ -17,8 +17,8 @@ module.exports = {
         try {
             await command.execute(interaction);
         } catch (error) {
-            // Kalau error 40060 = interaction sudah dibalas oleh command itu sendiri, abaikan
-            if (error?.code === 40060) return;
+            // Abaikan error interaksi yang sudah expired/dibalas
+            if (error?.code === 40060 || error?.code === 10062) return;
 
             console.error(error);
             const errorReply = {

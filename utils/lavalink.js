@@ -5,8 +5,21 @@ const { EmbedBuilder } = require("discord.js");
 // Load Lavalink nodes from environment variables
 const nodes = [];
 
-// Main node
-if (process.env.LAVALINK_MAIN_URL) {
+// Loop through env vars to find all LAVALINK_NODE_x configurations (up to 10 nodes)
+for (let i = 1; i <= 10; i++) {
+    const url = process.env[`LAVALINK_NODE_${i}_URL`];
+    if (url) {
+        nodes.push({
+            name: process.env[`LAVALINK_NODE_${i}_NAME`] || `Node-${i}`,
+            url: url,
+            auth: process.env[`LAVALINK_NODE_${i}_AUTH`] || "youshallnotpass",
+            secure: process.env[`LAVALINK_NODE_${i}_SECURE`] === "true",
+        });
+    }
+}
+
+// Fallback to old env vars if dynamic nodes aren't set
+if (nodes.length === 0 && process.env.LAVALINK_MAIN_URL) {
     nodes.push({
         name: process.env.LAVALINK_MAIN_NAME || "Lavalink-Main",
         url: process.env.LAVALINK_MAIN_URL,
@@ -14,9 +27,7 @@ if (process.env.LAVALINK_MAIN_URL) {
         secure: process.env.LAVALINK_MAIN_SECURE === "true",
     });
 }
-
-// Fallback node
-if (process.env.LAVALINK_FALLBACK_URL) {
+if (nodes.length === 0 && process.env.LAVALINK_FALLBACK_URL) {
     nodes.push({
         name: process.env.LAVALINK_FALLBACK_NAME || "Lavalink-Fallback",
         url: process.env.LAVALINK_FALLBACK_URL,
@@ -25,7 +36,7 @@ if (process.env.LAVALINK_FALLBACK_URL) {
     });
 }
 
-// Fallback to default nodes if no env vars set
+// Fallback to default nodes if absolutely no env vars are set
 if (nodes.length === 0) {
     console.warn(
         "⚠️ No Lavalink nodes configured in .env, using default nodes",
@@ -123,6 +134,7 @@ function patchNodeRest(node, nodeName) {
 
 // Track which nodes support Spotify (LavaSrc plugin)
 const spotifyNodes = new Set();
+const testedNodes = new Set(); // Nodes already tested for Spotify (avoid repeated tests on reconnect)
 
 function initLavalink(client) {
     kazagumo = new Kazagumo(
@@ -224,8 +236,9 @@ function initLavalink(client) {
         const node = kazagumo.shoukaku.nodes.get(name);
         patchNodeRest(node, name);
 
-        // Check if node supports Spotify (LavaSrc plugin)
-        if (!reconnected) {
+        // Check if node supports Spotify (LavaSrc plugin) — only test once per node name
+        if (!testedNodes.has(name)) {
+            testedNodes.add(name);
             try {
                 const testResult = await kazagumo.search(
                     "https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT",
@@ -248,11 +261,14 @@ function initLavalink(client) {
                     `⚠️ Node "${name}" does NOT support Spotify directly - using YouTube fallback`,
                 );
             }
+        } else {
+            console.log(`ℹ️ Node "${name}" already tested for Spotify — skipping re-test`);
         }
     });
 
     kazagumo.shoukaku.on("error", (name, error) => {
-        console.error(`❌ Lavalink node "${name}" error:`, error.message);
+        const msg = error?.message || error?.code || error?.toString?.() || "Unknown error";
+        console.error(`❌ Lavalink node "${name}" error: ${msg}`);
     });
 
     kazagumo.shoukaku.on("close", (name, code, reason) => {
