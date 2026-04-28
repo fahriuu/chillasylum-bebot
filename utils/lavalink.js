@@ -1,6 +1,7 @@
 const { Kazagumo } = require("kazagumo");
 const { Connectors } = require("shoukaku");
 const { EmbedBuilder } = require("discord.js");
+const Spotify = require("kazagumo-spotify");
 
 // Load Lavalink nodes from environment variables
 const nodes = [];
@@ -140,6 +141,15 @@ function initLavalink(client) {
     kazagumo = new Kazagumo(
         {
             defaultSearchEngine: "youtube",
+            plugins: [
+                new Spotify({
+                    clientId: process.env.SPOTIFY_CLIENT_ID,
+                    clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
+                    playlistPageLimit: 1, 
+                    albumPageLimit: 1, 
+                    searchLimit: 10,
+                })
+            ],
             send: (guildId, payload) => {
                 const guild = client.guilds.cache.get(guildId);
                 if (guild) guild.shard.send(payload);
