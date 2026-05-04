@@ -170,14 +170,24 @@ module.exports = {
         }
 
         // Check if any Lavalink node is connected
-        const activeNodes = kazagumo.shoukaku.nodes?.size || 0;
-        if (activeNodes === 0) {
-            const embed = new EmbedBuilder()
-                .setColor("#ed4245")
-                .setDescription(
-                    "Tidak ada server musik yang terhubung saat ini. Bot sedang mencoba reconnect, coba lagi dalam beberapa detik.",
-                );
-            return interaction.editReply({ embeds: [embed] });
+        let connectedNodes = kazagumo.shoukaku.nodes ? [...kazagumo.shoukaku.nodes.values()].filter(n => n.state === 1).length : 0;
+        
+        // Wait up to 5 seconds for a node to connect if it's still booting
+        if (connectedNodes === 0) {
+            for (let i = 0; i < 5; i++) {
+                await new Promise(r => setTimeout(r, 1000));
+                connectedNodes = kazagumo.shoukaku.nodes ? [...kazagumo.shoukaku.nodes.values()].filter(n => n.state === 1).length : 0;
+                if (connectedNodes > 0) break;
+            }
+            
+            if (connectedNodes === 0) {
+                const embed = new EmbedBuilder()
+                    .setColor("#ed4245")
+                    .setDescription(
+                        "Tidak ada server musik yang terhubung saat ini. Bot sedang mencoba reconnect, coba lagi dalam beberapa detik.",
+                    );
+                return interaction.editReply({ embeds: [embed] });
+            }
         }
 
         // Check if bot is already in a different voice channel
