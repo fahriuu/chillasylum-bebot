@@ -108,6 +108,31 @@ function patchNodeRest(node, nodeName) {
                 return await originalFetch(...args);
             } catch (error) {
                 lastError = error;
+
+                // 404 = session expired or player doesn't exist on Lavalink anymore
+                // This happens when a public Lavalink node restarts and old session IDs become invalid
+                if (error.status === 404) {
+                    console.warn(
+                        `⚠️ [${nodeName}] Session/player not found (404) on ${error.path || "unknown"}. Lavalink node likely restarted.`,
+                    );
+                    // Try to clean up stale player for this guild
+                    const pathMatch = (error.path || "").match(/players\/(\d+)/);
+                    if (pathMatch && kazagumo) {
+                        const guildId = pathMatch[1];
+                        try {
+                            const stalePlayer = kazagumo.players.get(guildId);
+                            if (stalePlayer) {
+                                console.log(`🧹 Destroying stale player for guild ${guildId} due to 404`);
+                                stalePlayer.destroy();
+                            }
+                        } catch (e) {
+                            // Ignore cleanup errors
+                        }
+                    }
+                    // Suppress to prevent crash — caller will handle null/undefined
+                    return null;
+                }
+
                 if (error.status === 429) {
                     const delay =
                         Math.pow(2, attempt) * 1000 +
@@ -118,7 +143,7 @@ function patchNodeRest(node, nodeName) {
                     await new Promise((r) => setTimeout(r, delay));
                     continue;
                 }
-                // Not a 429 — rethrow immediately
+                // Not a 429 or 404 — rethrow immediately
                 throw error;
             }
         }
@@ -245,6 +270,27 @@ function initLavalink(client) {
         // Patch REST rate-limit handler for this node
         const node = kazagumo.shoukaku.nodes.get(name);
         patchNodeRest(node, name);
+
+        // On reconnect, destroy all players that were using this node
+        // because the old session ID is invalid — players must be recreated
+        if (reconnected) {
+            console.log(`🧹 Cleaning up stale players after node "${name}" reconnected...`);
+            let cleaned = 0;
+            for (const [guildId, player] of kazagumo.players) {
+                try {
+                    // Check if this player's node matches the reconnected node
+                    if (player.shoukaku?.node?.name === name || player.node?.name === name) {
+                        player.destroy();
+                        cleaned++;
+                    }
+                } catch (e) {
+                    // Ignore cleanup errors
+                }
+            }
+            if (cleaned > 0) {
+                console.log(`🧹 Destroyed ${cleaned} stale player(s) from node "${name}". Users can /play again.`);
+            }
+        }
 
         // Check if node supports Spotify (LavaSrc plugin) — only test once per node name
         if (!testedNodes.has(name)) {
