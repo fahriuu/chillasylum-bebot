@@ -14,7 +14,7 @@ async function refreshToken() {
         const data = await spotifyApi.clientCredentialsGrant();
         spotifyApi.setAccessToken(data.body.access_token);
         tokenExpiry = Date.now() + (data.body.expires_in - 60) * 1000;
-        console.log("✅ Spotify token refreshed");
+        console.log("Spotify token refreshed");
         return true;
     } catch (error) {
         let errMsg = "Unknown error";

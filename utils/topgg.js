@@ -6,16 +6,16 @@ let topggWebhook = null;
 // Initialize Top.gg API
 function initTopggApi() {
     if (!process.env.TOPGG_TOKEN) {
-        console.log("⚠️ Top.gg token not configured");
+        console.log(" Top.gg token not configured");
         return null;
     }
 
     try {
         topggApi = new Api(process.env.TOPGG_TOKEN);
-        console.log("✅ Top.gg API initialized");
+        console.log("Top.gg API initialized");
         return topggApi;
     } catch (error) {
-        console.error("❌ Failed to initialize Top.gg API:", error.message);
+        console.error(" Failed to initialize Top.gg API:", error.message);
         return null;
     }
 }
@@ -23,16 +23,16 @@ function initTopggApi() {
 // Initialize Top.gg Webhook (for vote notifications)
 function initTopggWebhook(port = 3000) {
     if (!process.env.TOPGG_WEBHOOK_SECRET) {
-        console.log("⚠️ Top.gg webhook secret not configured");
+        console.log(" Top.gg webhook secret not configured");
         return null;
     }
 
     try {
         topggWebhook = new Webhook(process.env.TOPGG_WEBHOOK_SECRET);
-        console.log(`✅ Top.gg Webhook initialized on port ${port}`);
+        console.log(` Top.gg Webhook initialized on port ${port}`);
         return topggWebhook;
     } catch (error) {
-        console.error("❌ Failed to initialize Top.gg Webhook:", error.message);
+        console.error(" Failed to initialize Top.gg Webhook:", error.message);
         return null;
     }
 }
@@ -98,7 +98,7 @@ async function postStats(client) {
             shardCount: client.shard?.count || 0,
         });
         console.log(
-            `✅ Posted stats to Top.gg: ${client.guilds.cache.size} servers`,
+            `Posted stats to Top.gg: ${client.guilds.cache.size} servers`,
         );
         return true;
     } catch (error) {

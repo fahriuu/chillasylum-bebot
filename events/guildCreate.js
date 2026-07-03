@@ -10,9 +10,9 @@ module.exports = {
         try {
             // Fetch semua member di guild baru (opsional, tapi bagus untuk sinkronisasi)
             await guild.members.fetch();
-            console.log(`✅ Fetched ${guild.memberCount} members dari ${guild.name}`);
+            console.log(`Fetched ${guild.memberCount} members dari ${guild.name}`);
         } catch (err) {
-            console.error(`❌ Gagal fetch members dari ${guild.name}:`, err.message);
+            console.error(`Gagal fetch members dari ${guild.name}:`, err.message);
         }
 
         // Deploy slash commands khusus untuk guild baru ini

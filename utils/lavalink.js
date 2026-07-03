@@ -155,7 +155,7 @@ function patchNodeRest(node, nodeName) {
     };
 
     node.rest._rateLimitPatched = true;
-    console.log(`🛡️ Rate-limit handler patched for node "${nodeName}"`);
+    console.log(` Rate-limit handler patched for node "${nodeName}"`);
 }
 
 // Track which nodes support Spotify (LavaSrc plugin)
@@ -264,7 +264,7 @@ function initLavalink(client) {
     // Node events
     kazagumo.shoukaku.on("ready", async (name, reconnected) => {
         console.log(
-            `✅ Lavalink node "${name}" ${reconnected ? "reconnected" : "connected"}`,
+            `Lavalink node "${name}" ${reconnected ? "reconnected" : "connected"}`,
         );
 
         // Patch REST rate-limit handler for this node
@@ -303,7 +303,7 @@ function initLavalink(client) {
                 if (testResult.tracks.length > 0) {
                     spotifyNodes.add(name);
                     console.log(
-                        `🟢 Node "${name}" supports Spotify (LavaSrc)`,
+                        `Node "${name}" supports Spotify (LavaSrc)`,
                     );
                 } else {
                     spotifyNodes.delete(name);
