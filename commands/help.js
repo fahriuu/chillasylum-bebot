@@ -15,7 +15,7 @@ module.exports = {
             .setDescription("Berikut adalah daftar commands yang tersedia:")
             .addFields(
                 {
-                    name: "🎵 Music Commands",
+                    name: " Music Commands",
                     value: [
                         "`/play` - Putar lagu dari Spotify/YouTube",
                         "`/random` - Play random musik by genre",

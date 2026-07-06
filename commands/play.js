@@ -529,7 +529,7 @@ module.exports = {
                         const embed = new EmbedBuilder()
                             .setColor("#A238FF")
                             .setAuthor({
-                                name: "✅ Added to Queue",
+                                name: "Added to Queue",
                                 iconURL: "https://cdn-icons-png.flaticon.com/512/5968/5968837.png"
                             })
                             .setTitle(listInfo ? listInfo.name : "Deezer Playlist")

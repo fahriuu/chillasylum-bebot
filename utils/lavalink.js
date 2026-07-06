@@ -4,13 +4,13 @@ const { EmbedBuilder } = require("discord.js");
 const Spotify = require("kazagumo-spotify");
 
 // Load Lavalink nodes from environment variables
-const nodes = [];
+let rawNodes = [];
 
 // Loop through env vars to find all LAVALINK_NODE_x configurations (up to 10 nodes)
 for (let i = 1; i <= 10; i++) {
     const url = process.env[`LAVALINK_NODE_${i}_URL`];
     if (url) {
-        nodes.push({
+        rawNodes.push({
             name: process.env[`LAVALINK_NODE_${i}_NAME`] || `Node-${i}`,
             url: url,
             auth: process.env[`LAVALINK_NODE_${i}_AUTH`] || "youshallnotpass",
@@ -20,16 +20,16 @@ for (let i = 1; i <= 10; i++) {
 }
 
 // Fallback to old env vars if dynamic nodes aren't set
-if (nodes.length === 0 && process.env.LAVALINK_MAIN_URL) {
-    nodes.push({
+if (rawNodes.length === 0 && process.env.LAVALINK_MAIN_URL) {
+    rawNodes.push({
         name: process.env.LAVALINK_MAIN_NAME || "Lavalink-Main",
         url: process.env.LAVALINK_MAIN_URL,
         auth: process.env.LAVALINK_MAIN_AUTH || "youshallnotpass",
         secure: process.env.LAVALINK_MAIN_SECURE === "true",
     });
 }
-if (nodes.length === 0 && process.env.LAVALINK_FALLBACK_URL) {
-    nodes.push({
+if (rawNodes.length === 0 && process.env.LAVALINK_FALLBACK_URL) {
+    rawNodes.push({
         name: process.env.LAVALINK_FALLBACK_NAME || "Lavalink-Fallback",
         url: process.env.LAVALINK_FALLBACK_URL,
         auth: process.env.LAVALINK_FALLBACK_AUTH || "youshallnotpass",
@@ -38,11 +38,11 @@ if (nodes.length === 0 && process.env.LAVALINK_FALLBACK_URL) {
 }
 
 // Fallback to default nodes if absolutely no env vars are set
-if (nodes.length === 0) {
+if (rawNodes.length === 0) {
     console.warn(
         "⚠️ No Lavalink nodes configured in .env, using default nodes",
     );
-    nodes.push(
+    rawNodes.push(
         {
             name: "Serenetia",
             url: "lavalinkv4.serenetia.com:443",
@@ -50,12 +50,46 @@ if (nodes.length === 0) {
             secure: true,
         },
         {
-            name: "Jirayu",
-            url: "lavalink.jirayu.net:443",
-            auth: "youshallnotpass",
+            name: "TriniumHost",
+            url: "lavalink-v4.triniumhost.com:443",
+            auth: "free",
             secure: true,
         },
+        {
+            name: "Nodelink",
+            url: "nodelink.triniumhost.com:443",
+            auth: "free",
+            secure: true,
+        }
     );
+}
+
+// Filter out known dead/offline nodes and inject working backups dynamically
+const nodes = [];
+for (const node of rawNodes) {
+    if (node.url.includes("jirayu.net") || node.url.includes("millohost.my.id")) {
+        console.log(`🧹 Skipping offline/dead node: ${node.name}`);
+        continue;
+    }
+    nodes.push(node);
+}
+
+// Always ensure we have TriniumHost and Nodelink as backups if not already present
+if (!nodes.some(n => n.url.includes("triniumhost.com"))) {
+    nodes.push({
+        name: "TriniumHost",
+        url: "lavalink-v4.triniumhost.com:443",
+        auth: "free",
+        secure: true,
+    });
+}
+if (!nodes.some(n => n.url.includes("nodelink.triniumhost.com"))) {
+    nodes.push({
+        name: "Nodelink",
+        url: "nodelink.triniumhost.com:443",
+        auth: "free",
+        secure: true,
+    });
 }
 
 console.log(`🎵 Loaded ${nodes.length} Lavalink node(s) from configuration`);
@@ -155,7 +189,7 @@ function patchNodeRest(node, nodeName) {
     };
 
     node.rest._rateLimitPatched = true;
-    console.log(`🛡️ Rate-limit handler patched for node "${nodeName}"`);
+    console.log(` Rate-limit handler patched for node "${nodeName}"`);
 }
 
 // Track which nodes support Spotify (LavaSrc plugin)
@@ -264,7 +298,7 @@ function initLavalink(client) {
     // Node events
     kazagumo.shoukaku.on("ready", async (name, reconnected) => {
         console.log(
-            `✅ Lavalink node "${name}" ${reconnected ? "reconnected" : "connected"}`,
+            `Lavalink node "${name}" ${reconnected ? "reconnected" : "connected"}`,
         );
 
         // Patch REST rate-limit handler for this node
@@ -303,7 +337,7 @@ function initLavalink(client) {
                 if (testResult.tracks.length > 0) {
                     spotifyNodes.add(name);
                     console.log(
-                        `🟢 Node "${name}" supports Spotify (LavaSrc)`,
+                        `Node "${name}" supports Spotify (LavaSrc)`,
                     );
                 } else {
                     spotifyNodes.delete(name);

@@ -1,4 +1,8 @@
 require("dotenv").config();
+const dns = require("dns");
+if (dns.setDefaultResultOrder) {
+    dns.setDefaultResultOrder("ipv4first");
+}
 const fs = require("fs");
 const path = require("path");
 const { Client, IntentsBitField, Collection, EmbedBuilder } = require("discord.js");
@@ -38,7 +42,7 @@ for (const file of commandFiles) {
     // Prefix commands
     else if (command.prefix && "name" in command && "execute" in command) {
         client.prefixCommands.set(command.name, command);
-        console.log(`✅ Prefix Command loaded: !${command.name}`);
+        console.log(`Prefix Command loaded: !${command.name}`);
     }
 }
 
@@ -327,7 +331,7 @@ if (process.env.TOPGG_TOKEN) {
             await topgg.postStats({
                 serverCount: client.guilds.cache.size,
             });
-            console.log(`✅ Top.gg stats posted: ${client.guilds.cache.size} servers`);
+            console.log(`Top.gg stats posted: ${client.guilds.cache.size} servers`);
         } catch (error) {
             console.error("❌ Top.gg post stats error:", error.message);
         }
@@ -337,7 +341,7 @@ if (process.env.TOPGG_TOKEN) {
     client.once("clientReady", () => {
         postTopggStats();
         setInterval(postTopggStats, 30 * 60 * 1000);
-        console.log("🔝 Top.gg stat poster initialized");
+        console.log("Top.gg stat poster initialized");
     });
 } else {
     console.log("⚠️ Top.gg token not found - stats posting disabled");
