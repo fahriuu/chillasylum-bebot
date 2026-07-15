@@ -60,6 +60,12 @@ if (rawNodes.length === 0) {
             url: "nodelink.triniumhost.com:443",
             auth: "free",
             secure: true,
+        },
+        {
+            name: "Nodelink-02",
+            url: "nodelink-02.triniumhost.com:443",
+            auth: "trinium",
+            secure: true,
         }
     );
 }
@@ -74,8 +80,8 @@ for (const node of rawNodes) {
     nodes.push(node);
 }
 
-// Always ensure we have TriniumHost and Nodelink as backups if not already present
-if (!nodes.some(n => n.url.includes("triniumhost.com"))) {
+// Always ensure we have TriniumHost, Nodelink, and Nodelink-02 as backups if not already present
+if (!nodes.some(n => n.url.includes("lavalink-v4.triniumhost.com"))) {
     nodes.push({
         name: "TriniumHost",
         url: "lavalink-v4.triniumhost.com:443",
@@ -91,10 +97,22 @@ if (!nodes.some(n => n.url.includes("nodelink.triniumhost.com"))) {
         secure: true,
     });
 }
+if (!nodes.some(n => n.url.includes("nodelink-02.triniumhost.com"))) {
+    nodes.push({
+        name: "Nodelink-02",
+        url: "nodelink-02.triniumhost.com:443",
+        auth: "trinium",
+        secure: true,
+    });
+}
 
 console.log(`🎵 Loaded ${nodes.length} Lavalink node(s) from configuration`);
 
 let kazagumo = null;
+
+// Blacklist tracker: nodes rejected with code 4000 (too many connections)
+// Maps node name -> { until: timestamp, nodeConfig: {...} }
+const blacklistedNodes = new Map();
 
 // Helper: truncate text safely
 function truncate(str, max) {
@@ -219,12 +237,20 @@ function initLavalink(client) {
         {
             moveOnDisconnect: false,
             resume: false,
-            reconnectTries: 10,
+            reconnectTries: 3,
+            reconnectInterval: 15, // 15 seconds between reconnection attempts (prevents spam)
             restTimeout: 30,
             voiceConnectionTimeout: 15,
             nodeResolver: (nodes) => {
-                // Pick connected nodes, prefer Spotify-capable ones
-                const connected = [...nodes.values()].filter((node) => node.state === 1);
+                // Pick connected nodes, exclude blacklisted ones
+                const now = Date.now();
+                const connected = [...nodes.values()].filter((node) => {
+                    if (node.state !== 1) return false;
+                    // Skip blacklisted nodes
+                    const bl = blacklistedNodes.get(node.name);
+                    if (bl && now < bl.until) return false;
+                    return true;
+                });
                 if (connected.length === 0) return null;
 
                 // Prefer Spotify-capable nodes so Spotify searches don't route to incompatible nodes
@@ -363,11 +389,62 @@ function initLavalink(client) {
 
     kazagumo.shoukaku.on("close", (name, code, reason) => {
         console.log(
-            `⚠️ Lavalink node "${name}" closed: ${code} - ${
+            `⚠ Lavalink node "${name}" closed: ${code} - ${
                 reason || "No reason"
             }`,
         );
         spotifyNodes.delete(name);
+
+        // Code 4000 = "Too many websocket connections" — stop reconnecting to this node
+        // It will only make things worse. Blacklist for 5 minutes, then re-add.
+        if (code === 4000) {
+            const COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
+            console.warn(
+                `🚫 Node "${name}" rejected connection (4000). Blacklisting for 5 minutes to prevent reconnect spam.`,
+            );
+
+            // Save the node config before removing
+            const nodeConfig = nodes.find((n) => n.name === name);
+
+            // Remove node from Shoukaku to completely stop reconnection attempts
+            try {
+                kazagumo.shoukaku.removeNode(name, "Blacklisted: too many connections (4000)");
+                console.log(`🗑️ Node "${name}" removed from Shoukaku.`);
+            } catch (e) {
+                console.warn(`⚠ Could not remove node "${name}": ${e.message}`);
+            }
+
+            // Track blacklist
+            blacklistedNodes.set(name, {
+                until: Date.now() + COOLDOWN_MS,
+                nodeConfig: nodeConfig,
+            });
+
+            // Schedule re-add after cooldown
+            if (nodeConfig) {
+                setTimeout(() => {
+                    console.log(`🔄 Cooldown expired for node "${name}". Re-adding to Shoukaku...`);
+                    blacklistedNodes.delete(name);
+                    try {
+                        kazagumo.shoukaku.addNode({
+                            name: nodeConfig.name,
+                            url: nodeConfig.url,
+                            auth: nodeConfig.auth,
+                            secure: nodeConfig.secure,
+                        });
+                    } catch (e) {
+                        console.error(`❌ Failed to re-add node "${name}": ${e.message}`);
+                    }
+                }, COOLDOWN_MS);
+            }
+        }
+    });
+
+    // Log reconnection attempts so we can see the backoff working
+    kazagumo.shoukaku.on("reconnecting", (name, reconnectsLeft, interval) => {
+        console.log(
+            `🔄 Reconnecting to node "${name}" in ${interval}s... (${reconnectsLeft} tries left)`,
+        );
     });
 
     kazagumo.shoukaku.on("disconnect", (name, players, moved) => {
