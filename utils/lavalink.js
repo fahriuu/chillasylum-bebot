@@ -44,27 +44,15 @@ if (rawNodes.length === 0) {
     );
     rawNodes.push(
         {
-            name: "Serenetia",
-            url: "lavalinkv4.serenetia.com:443",
-            auth: "https://seretia.link/discord",
-            secure: true,
-        },
-        {
             name: "TriniumHost",
             url: "lavalink-v4.triniumhost.com:443",
             auth: "free",
             secure: true,
         },
         {
-            name: "Nodelink",
-            url: "nodelink.triniumhost.com:443",
-            auth: "free",
-            secure: true,
-        },
-        {
-            name: "Nodelink-02",
-            url: "nodelink-02.triniumhost.com:443",
-            auth: "trinium",
+            name: "Serenetia",
+            url: "lavalinkv4.serenetia.com:443",
+            auth: "https://seretia.link/discord",
             secure: true,
         }
     );
@@ -73,14 +61,15 @@ if (rawNodes.length === 0) {
 // Filter out known dead/offline/blocked nodes and inject working backups dynamically
 const nodes = [];
 for (const node of rawNodes) {
-    if (node.url.includes("jirayu.net") || node.url.includes("millohost.my.id") || node.url.includes("serenetia.com")) {
-        console.log(`🧹 Skipping blocked/dead node: ${node.name}`);
+    // Skip nodes that are confirmed dead or blocked (NodeLink v3 nodes are NOT compatible with Shoukaku v4)
+    if (node.url.includes("jirayu.net") || node.url.includes("millohost.my.id") || node.url.includes("nodelink.triniumhost.com") || node.url.includes("nodelink-02.triniumhost.com")) {
+        console.log(`🧹 Skipping incompatible/dead node: ${node.name}`);
         continue;
     }
     nodes.push(node);
 }
 
-// Always ensure we have TriniumHost, Nodelink, and Nodelink-02 as backups if not already present
+// Always ensure we have TriniumHost and Serenetia (both Lavalink v4) as backups
 if (!nodes.some(n => n.url.includes("lavalink-v4.triniumhost.com"))) {
     nodes.push({
         name: "TriniumHost",
@@ -89,19 +78,11 @@ if (!nodes.some(n => n.url.includes("lavalink-v4.triniumhost.com"))) {
         secure: true,
     });
 }
-if (!nodes.some(n => n.url.includes("nodelink.triniumhost.com"))) {
+if (!nodes.some(n => n.url.includes("serenetia.com"))) {
     nodes.push({
-        name: "Nodelink",
-        url: "nodelink.triniumhost.com:443",
-        auth: "free",
-        secure: true,
-    });
-}
-if (!nodes.some(n => n.url.includes("nodelink-02.triniumhost.com"))) {
-    nodes.push({
-        name: "Nodelink-02",
-        url: "nodelink-02.triniumhost.com:443",
-        auth: "trinium",
+        name: "Serenetia",
+        url: "lavalinkv4.serenetia.com:443",
+        auth: "https://seretia.link/discord",
         secure: true,
     });
 }
