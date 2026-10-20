@@ -116,15 +116,13 @@ async function createPlayerWithRetry(kazagumo, options, maxRetries = 2) {
                 } catch (e) {
                     // Ignore cleanup errors
                 }
-                // Wait before retry (increasing delay)
-                await new Promise((r) => setTimeout(r, 1500 * attempt));
+                // Wait before retry (shorter delay)
+                await new Promise((r) => setTimeout(r, 800 * attempt));
                 console.log(
                     `\uD83D\uDD04 Retry createPlayer attempt ${attempt + 1}/${maxRetries} for guild ${options.guildId}`,
                 );
             }
             const player = await kazagumo.createPlayer(options);
-            // Small delay to let voice connection fully stabilize
-            await new Promise((r) => setTimeout(r, 500));
             return player;
         } catch (error) {
             lastError = error;
@@ -172,10 +170,10 @@ module.exports = {
         // Check if any Lavalink node is connected
         let connectedNodes = kazagumo.shoukaku.nodes ? [...kazagumo.shoukaku.nodes.values()].filter(n => n.state === 1).length : 0;
         
-        // Wait up to 5 seconds for a node to connect if it's still booting
+        // Wait up to 3 seconds for a node to connect if it's still booting
         if (connectedNodes === 0) {
-            for (let i = 0; i < 5; i++) {
-                await new Promise(r => setTimeout(r, 1000));
+            for (let i = 0; i < 6; i++) {
+                await new Promise(r => setTimeout(r, 500));
                 connectedNodes = kazagumo.shoukaku.nodes ? [...kazagumo.shoukaku.nodes.values()].filter(n => n.state === 1).length : 0;
                 if (connectedNodes > 0) break;
             }
@@ -231,127 +229,142 @@ module.exports = {
 
             player.data.set("textChannel", interaction.channel);
 
-            // Handle Spotify URL - Use Lavalink directly (no Spotify API needed)
+            // Handle Spotify URL - Multi-fallback approach
             if (isSpotifyUrl(query)) {
                 const loadingEmbed = new EmbedBuilder()
                     .setColor("#1DB954")
-                    .setDescription(" Tunggu sedang mencari lagu...");
+                    .setDescription("🔍 Tunggu sedang mencari lagu...");
                 await interaction.editReply({ embeds: [loadingEmbed] });
 
-                try {
-                    // Try to load directly with Lavalink (LavaSrc plugin handles Spotify)
-                    let result = await kazagumo.search(query, {
-                        requester: interaction.user,
-                        engine: "spotify",
-                    });
+                let result = null;
 
-                    // If Spotify engine returned nothing, retry without engine restriction (auto-fallback)
-                    if (
-                        !result ||
-                        !result.tracks ||
-                        result.tracks.length === 0
-                    ) {
-                        console.log("Spotify search returned 0 results, retrying without engine restriction...");
+                // Strategy 1: Let kazagumo-spotify plugin handle it (client-side, uses Spotify API + YouTube search)
+                try {
+                    result = await kazagumo.search(query, {
+                        requester: interaction.user,
+                    });
+                    if (!result || !result.tracks || result.tracks.length === 0) {
+                        result = null;
+                    }
+                } catch (e) {
+                    console.log("kazagumo-spotify fallback failed:", e.message);
+                    result = null;
+                }
+
+                // Strategy 2: Try LavaSrc engine on nodes that support it (server-side Spotify)
+                if (!result) {
+                    try {
                         result = await kazagumo.search(query, {
                             requester: interaction.user,
+                            engine: "spotify",
                         });
-                    }
-
-                    if (
-                        !result ||
-                        !result.tracks ||
-                        result.tracks.length === 0
-                    ) {
-                        const embed = new EmbedBuilder()
-                            .setColor("#ed4245")
-                            .setDescription(
-                                 "Tidak bisa load Spotify link. Coba:\n" +
-                                    "1. Pastikan link valid dan public\n" +
-                                    "2. Atau search dengan judul lagu saja",
-                            );
-                        return interaction.editReply({ embeds: [embed] });
-                    }
-
-                    // Check if it's a playlist/album (multiple tracks)
-                    const isPlaylist = result.tracks.length > 1;
-
-                    if (isPlaylist) {
-                        result.tracks.forEach((track) => {
-                            track.source = "spotify";
-                            player.queue.add(track);
-                        });
-
-                        if (!player.playing && !player.paused) {
-                            await player.play();
+                        if (!result || !result.tracks || result.tracks.length === 0) {
+                            result = null;
                         }
-
-                        return sendPaginatedPlaylist(interaction, result.tracks, {
-                            color: "#1DB954",
-                            iconURL: "https://open.spotifycdn.com/cdn/images/favicon32.b64ecc03.png",
-                            playlistName: result.playlistName || "Spotify Playlist",
-                            url: query,
-                        });
-                    } else {
-                        // Single track
-                        const track = result.tracks[0];
-                        track.source = "spotify";
-                        player.queue.add(track);
-                        const queuePosition = player.queue.length;
-
-                        const isPlaying = player.playing || player.paused;
-                        if (!isPlaying) {
-                            await player.play();
-                        }
-
-                        const embed = new EmbedBuilder()
-                            .setColor("#1DB954")
-                            .setAuthor({
-                                name: isPlaying
-                                    ? "Added to Queue"
-                                    : "Now Playing",
-                                iconURL:
-                                    "https://open.spotifycdn.com/cdn/images/favicon32.b64ecc03.png",
-                            })
-                            .setTitle(truncate(track.title, 50))
-                            .setURL(track.uri)
-                            .setThumbnail(track.thumbnail || null)
-                            .setDescription(
-                                `by **${track.author || "Unknown"}**`,
-                            )
-                            .addFields(
-                                {
-                                    name: "Duration",
-                                    value: `\`${formatDuration(track.length)}\``,
-                                    inline: true,
-                                },
-                                {
-                                    name: "Position",
-                                    value: `\`#${queuePosition}\``,
-                                    inline: true,
-                                },
-                            )
-                            .setFooter({
-                                text: `Requested by ${interaction.user.username}`,
-                                iconURL: interaction.user.displayAvatarURL(),
-                            })
-                            .setTimestamp();
-
-                        return interaction.editReply({ embeds: [embed] });
+                    } catch (e) {
+                        console.log("LavaSrc Spotify fallback failed:", e.message);
+                        result = null;
                     }
-                } catch (spotifyError) {
-                    console.error(
-                        "Lavalink Spotify error:",
-                        spotifyError.message,
-                    );
+                }
 
-                    // Fallback: Try YouTube search with Spotify metadata
+                // Strategy 3: Extract track/artist name from Spotify URL path and search YouTube
+                if (!result) {
+                    try {
+                        // Try to extract meaningful search terms from the URL
+                        // Spotify URLs look like: https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT
+                        // The kazagumo-spotify plugin might have set a search query we can use
+                        // As last resort, just search the URL itself on YouTube
+                        console.log("All Spotify strategies failed, trying YouTube search with URL...");
+                        result = await kazagumo.search(query, {
+                            requester: interaction.user,
+                            engine: "youtube",
+                        });
+                        if (!result || !result.tracks || result.tracks.length === 0) {
+                            result = null;
+                        }
+                    } catch (e) {
+                        console.log("YouTube fallback for Spotify also failed:", e.message);
+                        result = null;
+                    }
+                }
+
+                if (!result || !result.tracks || result.tracks.length === 0) {
                     const embed = new EmbedBuilder()
                         .setColor("#ed4245")
                         .setDescription(
-                            "❌ Lavalink tidak support Spotify link.\n" +
-                                "Coba search dengan judul lagu saja, contoh:\n" +
-                                "`/play judul: shape of you ed sheeran`",
+                            "❌ Tidak bisa load Spotify link. Coba:\n" +
+                                "1. Pastikan link valid dan public\n" +
+                                "2. Atau search dengan judul lagu saja\n" +
+                                "Contoh: `/play judul: shape of you ed sheeran`",
                         );
+                    return interaction.editReply({ embeds: [embed] });
+                }
+
+                // Mark all tracks as spotify source
+                result.tracks.forEach((t) => { t.source = "spotify"; });
+
+                // Check if it's a playlist/album (multiple tracks)
+                const isPlaylist = result.tracks.length > 1;
+
+                if (isPlaylist) {
+                    result.tracks.forEach((track) => {
+                        player.queue.add(track);
+                    });
+
+                    if (!player.playing && !player.paused) {
+                        await player.play();
+                    }
+
+                    return sendPaginatedPlaylist(interaction, result.tracks, {
+                        color: "#1DB954",
+                        iconURL: "https://open.spotifycdn.com/cdn/images/favicon32.b64ecc03.png",
+                        playlistName: result.playlistName || "Spotify Playlist",
+                        url: query,
+                    });
+                } else {
+                    // Single track
+                    const track = result.tracks[0];
+                    player.queue.add(track);
+                    const queuePosition = player.queue.length;
+
+                    const isPlaying = player.playing || player.paused;
+                    if (!isPlaying) {
+                        await player.play();
+                    }
+
+                    const embed = new EmbedBuilder()
+                        .setColor("#1DB954")
+                        .setAuthor({
+                            name: isPlaying
+                                ? "Added to Queue"
+                                : "Now Playing",
+                            iconURL:
+                                "https://open.spotifycdn.com/cdn/images/favicon32.b64ecc03.png",
+                        })
+                        .setTitle(truncate(track.title, 50))
+                        .setURL(track.uri)
+                        .setThumbnail(track.thumbnail || null)
+                        .setDescription(
+                            `by **${track.author || "Unknown"}**`,
+                        )
+                        .addFields(
+                            {
+                                name: "Duration",
+                                value: `\`${formatDuration(track.length)}\``,
+                                inline: true,
+                            },
+                            {
+                                name: "Position",
+                                value: `\`#${queuePosition}\``,
+                                inline: true,
+                            },
+                        )
+                        .setFooter({
+                            text: `Requested by ${interaction.user.username}`,
+                            iconURL: interaction.user.displayAvatarURL(),
+                        })
+                        .setTimestamp();
+
                     return interaction.editReply({ embeds: [embed] });
                 }
             }
