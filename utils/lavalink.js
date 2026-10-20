@@ -248,14 +248,20 @@ function initLavalink(client) {
                 });
                 if (connected.length === 0) return null;
 
-                // Explicitly prioritize LocalVPS if it's available
-                const localNode = connected.find((n) => n.name === "LocalVPS");
-                if (localNode) return localNode;
+                // Sort by penalties (lower = better)
+                // Give LocalVPS a small bonus (subtract 1 from penalties) for lower latency
+                // but don't force it if it has high penalties from failures
+                const sorted = connected.sort((a, b) => {
+                    const aP = a.penalties - (a.name === "LocalVPS" ? 1 : 0);
+                    const bP = b.penalties - (b.name === "LocalVPS" ? 1 : 0);
+                    return aP - bP;
+                });
 
-                // Prefer Spotify-capable nodes so Spotify searches don't route to incompatible nodes
-                const spotifyCapable = connected.filter((n) => spotifyNodes.has(n.name));
-                const candidates = spotifyCapable.length > 0 ? spotifyCapable : connected;
-                return candidates.sort((a, b) => a.penalties - b.penalties)[0];
+                // Prefer Spotify-capable nodes for better compatibility
+                const spotifyCapable = sorted.filter((n) => spotifyNodes.has(n.name));
+                if (spotifyCapable.length > 0) return spotifyCapable[0];
+
+                return sorted[0];
             },
         },
     );

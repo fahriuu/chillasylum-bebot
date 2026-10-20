@@ -7,3 +7,6 @@ lavalink-server/
 data/
 lavalink/jre/
 lavalink/Lavalink.jar
+lavalink/.lavalink-version
+lavalink/plugins/
+lavalink/logs/

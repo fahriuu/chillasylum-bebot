@@ -24,7 +24,7 @@ lavalink:
       rotation: true
       channelMix: true
       lowPass: true
-    bufferDurationMs: 2000  # Lebih besar untuk mengurangi stuttering
+    bufferDurationMs: 2000
     frameBufferDurationMs: 5000
     opusEncodingQuality: 10
     resamplingQuality: LOW
@@ -34,7 +34,7 @@ lavalink:
     playerUpdateInterval: 5
     youtubeSearchEnabled: false  # Pakai plugin
     soundcloudSearchEnabled: true
-    gc-warnings: false  # Kurangi noise di log
+    gc-warnings: false
 
   plugins:
     - dependency: "dev.lavalink.youtube:youtube-plugin:1.18.2"
@@ -46,29 +46,49 @@ plugins:
     allowSearch: true
     allowDirectVideoIds: true
     allowDirectPlaylistIds: true
+    # Client list — plugin tries in order, falls back if one fails
+    # MUSIC & ANDROID_VR are best for audio playback
+    # TV is a good fallback that rarely gets blocked
+    # WEB is used for search/metadata only (playback blocked by YouTube)
     clients:
       - MUSIC
       - ANDROID_VR
+      - TV
       - WEB
       - WEBEMBEDDED
     clientOptions:
-      WEB:
-        playback: false
+      MUSIC:
+        playback: true
         videoLoading: true
-        playlistLoading: true
         searching: true
       ANDROID_VR:
         playback: true
         videoLoading: false
         searching: false
-      MUSIC:
+      TV:
         playback: true
+        videoLoading: false
+        searching: false
+      WEB:
+        playback: false
         videoLoading: true
+        playlistLoading: true
         searching: true
       WEBEMBEDDED:
         playback: true
         videoLoading: true
         searching: false
+    # YouTube OAuth — uncomment dan isi refreshToken jika IP VPS di-block YouTube
+    # Cara mendapatkan refreshToken:
+    # 1. Set enabled: true, skipInitialization: false
+    # 2. Restart Lavalink, cek log untuk link device code
+    # 3. Buka link di browser, login Google account
+    # 4. Copy refreshToken dari log, paste di bawah
+    # 5. Set skipInitialization: true
+    oauth:
+      enabled: false
+      # skipInitialization: true
+      # refreshToken: "YOUR_REFRESH_TOKEN_HERE"
 
 logging:
   file:

@@ -5,7 +5,7 @@
 
 LAVALINK_DIR="$(cd "$(dirname "$0")" && pwd)"
 LAVALINK_JAR="$LAVALINK_DIR/Lavalink.jar"
-LAVALINK_VERSION="4.0.8"
+LAVALINK_VERSION="4.2.2"
 DOWNLOAD_URL="https://github.com/lavalink-devs/Lavalink/releases/download/$LAVALINK_VERSION/Lavalink.jar"
 
 echo "🎵 ChillAsylum BeBot - Lavalink Starter"
@@ -53,10 +53,21 @@ if [ "$HAS_JAVA" = false ]; then
     fi
 fi
 
-# 2. Download Lavalink.jar jika belum ada
-if [ ! -f "$LAVALINK_JAR" ]; then
+# 2. Download Lavalink.jar jika belum ada ATAU versi berubah
+VERSION_FILE="$LAVALINK_DIR/.lavalink-version"
+CURRENT_VERSION=""
+if [ -f "$VERSION_FILE" ]; then
+    CURRENT_VERSION=$(cat "$VERSION_FILE")
+fi
+
+if [ ! -f "$LAVALINK_JAR" ] || [ "$CURRENT_VERSION" != "$LAVALINK_VERSION" ]; then
     echo ""
-    echo "📥 Lavalink.jar tidak ditemukan, mendownload..."
+    if [ -f "$LAVALINK_JAR" ]; then
+        echo "🔄 Upgrading Lavalink dari $CURRENT_VERSION ke $LAVALINK_VERSION..."
+        rm -f "$LAVALINK_JAR"
+    else
+        echo "📥 Lavalink.jar tidak ditemukan, mendownload..."
+    fi
     echo "URL: $DOWNLOAD_URL"
     
     if command -v wget &> /dev/null; then
@@ -73,7 +84,8 @@ if [ ! -f "$LAVALINK_JAR" ]; then
         exit 1
     fi
     
-    echo "✅ Download Lavalink.jar selesai!"
+    echo "$LAVALINK_VERSION" > "$VERSION_FILE"
+    echo "✅ Download Lavalink.jar v$LAVALINK_VERSION selesai!"
 fi
 
 # 3. Cek apakah application.yml ada
@@ -82,8 +94,9 @@ if [ ! -f "$LAVALINK_DIR/application.yml" ]; then
     exit 1
 fi
 
-# Bersihkan plugin lama jika ada
+# Bersihkan plugin lama
 rm -f "$LAVALINK_DIR/plugins/youtube-plugin-1.18.1.jar"
+rm -f "$LAVALINK_DIR/plugins/youtube-plugin-1.18.2.jar"
 
 # 4. Jalankan Lavalink
 echo ""
