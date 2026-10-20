@@ -331,112 +331,81 @@ module.exports = {
 
             player.data.set("textChannel", interaction.channel);
 
-            // Handle Spotify URL - Multi-fallback approach
+            // Handle Spotify URL - Spotify API first (fastest), then fallbacks
             if (isSpotifyUrl(query)) {
                 const loadingEmbed = new EmbedBuilder()
                     .setColor("#1DB954")
-                    .setDescription("🔍 Tunggu sedang mencari lagu...");
+                    .setDescription("🔍 Mencari lagu dari Spotify...");
                 await interaction.editReply({ embeds: [loadingEmbed] });
 
                 let result = null;
 
-                // Strategy 1: Let kazagumo-spotify plugin handle it (client-side, uses Spotify API + YouTube search)
+                // Strategy 1: Spotify API → YouTube search (fastest & most reliable)
                 try {
-                    result = await kazagumo.search(query, {
-                        requester: interaction.user,
-                    });
-                    if (!result || !result.tracks || result.tracks.length === 0) {
-                        result = null;
-                    }
-                } catch (e) {
-                    console.log("kazagumo-spotify fallback failed:", e.message);
-                    result = null;
-                }
-
-                // Strategy 2: Try LavaSrc engine on nodes that support it (server-side Spotify)
-                if (!result) {
-                    try {
-                        result = await kazagumo.search(query, {
-                            requester: interaction.user,
-                            engine: "spotify",
-                        });
-                        if (!result || !result.tracks || result.tracks.length === 0) {
-                            result = null;
-                        }
-                    } catch (e) {
-                        console.log("LavaSrc Spotify fallback failed:", e.message);
-                        result = null;
-                    }
-                }
-
-                // Strategy 3: Use Spotify API to get track name, then search YouTube
-                if (!result) {
-                    try {
-                        const parsed = parseSpotifyUrl(query);
-                        if (parsed) {
-                            console.log(`Spotify API fallback: type=${parsed.type}, id=${parsed.id}`);
-
-                            if (parsed.type === "track") {
-                                // Single track — get metadata from Spotify API, search YouTube
-                                const meta = await getSpotifyTrackInfo(parsed.id);
-                                if (meta) {
-                                    console.log(`Spotify track: "${meta.query}" — searching YouTube...`);
-                                    const ytResult = await kazagumo.search(meta.query, {
-                                        requester: interaction.user,
-                                    });
-                                    if (ytResult && ytResult.tracks && ytResult.tracks.length > 0) {
-                                        const track = ytResult.tracks[0];
-                                        // Override with Spotify metadata
-                                        track.title = meta.title;
-                                        track.author = meta.artist;
-                                        track.thumbnail = meta.thumbnail || track.thumbnail;
-                                        track.uri = meta.uri;
-                                        track.source = "spotify";
-                                        result = { tracks: [track], type: "TRACK" };
-                                    }
+                    const parsed = parseSpotifyUrl(query);
+                    if (parsed) {
+                        if (parsed.type === "track") {
+                            const meta = await getSpotifyTrackInfo(parsed.id);
+                            if (meta) {
+                                console.log(`🎵 Spotify: "${meta.query}" → searching YouTube...`);
+                                const ytResult = await kazagumo.search(meta.query, {
+                                    requester: interaction.user,
+                                });
+                                if (ytResult?.tracks?.length > 0) {
+                                    const track = ytResult.tracks[0];
+                                    track.title = meta.title;
+                                    track.author = meta.artist;
+                                    track.thumbnail = meta.thumbnail || track.thumbnail;
+                                    track.uri = meta.uri;
+                                    track.source = "spotify";
+                                    result = { tracks: [track], type: "TRACK" };
                                 }
-                            } else if (parsed.type === "playlist" || parsed.type === "album") {
-                                // Playlist/Album — get tracks from Spotify API, search YouTube for each
-                                const playlistData = await getSpotifyPlaylistTracks(parsed.id, parsed.type);
-                                if (playlistData && playlistData.tracks.length > 0) {
-                                    const limit = Math.min(playlistData.tracks.length, 20);
-                                    const resolvedTracks = [];
+                            }
+                        } else if (parsed.type === "playlist" || parsed.type === "album") {
+                            const playlistData = await getSpotifyPlaylistTracks(parsed.id, parsed.type);
+                            if (playlistData?.tracks?.length > 0) {
+                                const limit = Math.min(playlistData.tracks.length, 20);
+                                const resolvedTracks = [];
 
-                                    await interaction.editReply({
-                                        embeds: [new EmbedBuilder().setColor("#1DB954").setDescription(`🔍 Mencocokkan ${limit} lagu dari Spotify ke YouTube...`)]
-                                    });
+                                await interaction.editReply({
+                                    embeds: [new EmbedBuilder().setColor("#1DB954").setDescription(`🔍 Mencocokkan ${limit} lagu dari Spotify...`)]
+                                });
 
-                                    for (let i = 0; i < limit; i++) {
-                                        const meta = playlistData.tracks[i];
-                                        try {
-                                            const ytResult = await kazagumo.search(meta.query, {
-                                                requester: interaction.user,
-                                            });
-                                            if (ytResult && ytResult.tracks && ytResult.tracks.length > 0) {
-                                                const track = ytResult.tracks[0];
-                                                track.title = meta.title;
-                                                track.author = meta.artist;
-                                                track.thumbnail = meta.thumbnail || track.thumbnail;
-                                                track.uri = meta.uri;
-                                                track.source = "spotify";
-                                                resolvedTracks.push(track);
-                                            }
-                                        } catch (_) { /* skip failed tracks */ }
-                                    }
+                                for (let i = 0; i < limit; i++) {
+                                    const meta = playlistData.tracks[i];
+                                    try {
+                                        const ytResult = await kazagumo.search(meta.query, { requester: interaction.user });
+                                        if (ytResult?.tracks?.length > 0) {
+                                            const track = ytResult.tracks[0];
+                                            track.title = meta.title;
+                                            track.author = meta.artist;
+                                            track.thumbnail = meta.thumbnail || track.thumbnail;
+                                            track.uri = meta.uri;
+                                            track.source = "spotify";
+                                            resolvedTracks.push(track);
+                                        }
+                                    } catch (_) { /* skip */ }
+                                }
 
-                                    if (resolvedTracks.length > 0) {
-                                        result = {
-                                            tracks: resolvedTracks,
-                                            playlistName: playlistData.name,
-                                            type: "PLAYLIST",
-                                        };
-                                    }
+                                if (resolvedTracks.length > 0) {
+                                    result = { tracks: resolvedTracks, playlistName: playlistData.name, type: "PLAYLIST" };
                                 }
                             }
                         }
+                    }
+                } catch (e) {
+                    console.log("Spotify API strategy failed:", e.message);
+                }
+
+                // Strategy 2 (fallback): kazagumo-spotify plugin / LavaSrc
+                if (!result) {
+                    try {
+                        const fallbackResult = await kazagumo.search(query, { requester: interaction.user });
+                        if (fallbackResult?.tracks?.length > 0) {
+                            result = fallbackResult;
+                        }
                     } catch (e) {
-                        console.log("Spotify API fallback failed:", e.message);
-                        result = null;
+                        console.log("kazagumo-spotify fallback failed:", e.message);
                     }
                 }
 
