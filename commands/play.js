@@ -4,7 +4,109 @@ const { isDeezerUrl, parseDeezerUrl, getDeezerTrack, getDeezerAlbum, getDeezerPl
 
 // Helper function to check if URL is Spotify
 function isSpotifyUrl(url) {
-    return url.includes("open.spotify.com") || url.includes("spotify.com");
+    return url.includes("open.spotify.com") || url.includes("spotify.com") || url.includes("spotify.link");
+}
+
+// Extract Spotify track/playlist/album ID from URL
+function parseSpotifyUrl(url) {
+    const match = url.match(/(?:https:\/\/open\.spotify\.com\/|spotify:)(?:.+)?(track|playlist|album|artist)[\/:]([A-Za-z0-9]+)/);
+    if (match) return { type: match[1], id: match[2] };
+    return null;
+}
+
+// Spotify API: get access token using client credentials
+let spotifyTokenCache = { token: null, expires: 0 };
+async function getSpotifyToken() {
+    if (spotifyTokenCache.token && Date.now() < spotifyTokenCache.expires) {
+        return spotifyTokenCache.token;
+    }
+    const clientId = process.env.SPOTIFY_CLIENT_ID;
+    const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
+    if (!clientId || !clientSecret) return null;
+
+    try {
+        const res = await fetch("https://accounts.spotify.com/api/token", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Authorization": "Basic " + Buffer.from(`${clientId}:${clientSecret}`).toString("base64"),
+            },
+            body: "grant_type=client_credentials",
+        });
+        const data = await res.json();
+        if (data.access_token) {
+            spotifyTokenCache = { token: data.access_token, expires: Date.now() + (data.expires_in - 60) * 1000 };
+            return data.access_token;
+        }
+    } catch (e) {
+        console.error("Spotify token error:", e.message);
+    }
+    return null;
+}
+
+// Spotify API: get track info (returns search query for YouTube)
+async function getSpotifyTrackInfo(trackId) {
+    const token = await getSpotifyToken();
+    if (!token) return null;
+    try {
+        const res = await fetch(`https://api.spotify.com/v1/tracks/${trackId}`, {
+            headers: { "Authorization": `Bearer ${token}` },
+        });
+        const data = await res.json();
+        if (data.name && data.artists) {
+            const artist = data.artists.map(a => a.name).join(", ");
+            return {
+                query: `${artist} - ${data.name}`,
+                title: data.name,
+                artist: artist,
+                thumbnail: data.album?.images?.[0]?.url || null,
+                uri: data.external_urls?.spotify || `https://open.spotify.com/track/${trackId}`,
+                duration: data.duration_ms || 0,
+            };
+        }
+    } catch (e) {
+        console.error("Spotify API error:", e.message);
+    }
+    return null;
+}
+
+// Spotify API: get playlist/album tracks
+async function getSpotifyPlaylistTracks(id, type) {
+    const token = await getSpotifyToken();
+    if (!token) return null;
+    try {
+        const endpoint = type === "album"
+            ? `https://api.spotify.com/v1/albums/${id}`
+            : `https://api.spotify.com/v1/playlists/${id}`;
+        const res = await fetch(endpoint, {
+            headers: { "Authorization": `Bearer ${token}` },
+        });
+        const data = await res.json();
+        if (!data.tracks) return null;
+
+        const items = data.tracks.items || [];
+        const tracks = items.slice(0, 50).map(item => {
+            const track = type === "playlist" ? item.track : item;
+            if (!track || !track.name) return null;
+            const artist = (track.artists || []).map(a => a.name).join(", ");
+            return {
+                query: `${artist} - ${track.name}`,
+                title: track.name,
+                artist: artist,
+                thumbnail: track.album?.images?.[0]?.url || data.images?.[0]?.url || null,
+                uri: track.external_urls?.spotify || "",
+                duration: track.duration_ms || 0,
+            };
+        }).filter(Boolean);
+
+        return {
+            name: data.name || "Spotify Playlist",
+            tracks,
+        };
+    } catch (e) {
+        console.error("Spotify playlist API error:", e.message);
+    }
+    return null;
 }
 
 // Helper: truncate text
@@ -267,23 +369,73 @@ module.exports = {
                     }
                 }
 
-                // Strategy 3: Extract track/artist name from Spotify URL path and search YouTube
+                // Strategy 3: Use Spotify API to get track name, then search YouTube
                 if (!result) {
                     try {
-                        // Try to extract meaningful search terms from the URL
-                        // Spotify URLs look like: https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT
-                        // The kazagumo-spotify plugin might have set a search query we can use
-                        // As last resort, just search the URL itself on YouTube
-                        console.log("All Spotify strategies failed, trying YouTube search with URL...");
-                        result = await kazagumo.search(query, {
-                            requester: interaction.user,
-                            engine: "youtube",
-                        });
-                        if (!result || !result.tracks || result.tracks.length === 0) {
-                            result = null;
+                        const parsed = parseSpotifyUrl(query);
+                        if (parsed) {
+                            console.log(`Spotify API fallback: type=${parsed.type}, id=${parsed.id}`);
+
+                            if (parsed.type === "track") {
+                                // Single track — get metadata from Spotify API, search YouTube
+                                const meta = await getSpotifyTrackInfo(parsed.id);
+                                if (meta) {
+                                    console.log(`Spotify track: "${meta.query}" — searching YouTube...`);
+                                    const ytResult = await kazagumo.search(meta.query, {
+                                        requester: interaction.user,
+                                    });
+                                    if (ytResult && ytResult.tracks && ytResult.tracks.length > 0) {
+                                        const track = ytResult.tracks[0];
+                                        // Override with Spotify metadata
+                                        track.title = meta.title;
+                                        track.author = meta.artist;
+                                        track.thumbnail = meta.thumbnail || track.thumbnail;
+                                        track.uri = meta.uri;
+                                        track.source = "spotify";
+                                        result = { tracks: [track], type: "TRACK" };
+                                    }
+                                }
+                            } else if (parsed.type === "playlist" || parsed.type === "album") {
+                                // Playlist/Album — get tracks from Spotify API, search YouTube for each
+                                const playlistData = await getSpotifyPlaylistTracks(parsed.id, parsed.type);
+                                if (playlistData && playlistData.tracks.length > 0) {
+                                    const limit = Math.min(playlistData.tracks.length, 20);
+                                    const resolvedTracks = [];
+
+                                    await interaction.editReply({
+                                        embeds: [new EmbedBuilder().setColor("#1DB954").setDescription(`🔍 Mencocokkan ${limit} lagu dari Spotify ke YouTube...`)]
+                                    });
+
+                                    for (let i = 0; i < limit; i++) {
+                                        const meta = playlistData.tracks[i];
+                                        try {
+                                            const ytResult = await kazagumo.search(meta.query, {
+                                                requester: interaction.user,
+                                            });
+                                            if (ytResult && ytResult.tracks && ytResult.tracks.length > 0) {
+                                                const track = ytResult.tracks[0];
+                                                track.title = meta.title;
+                                                track.author = meta.artist;
+                                                track.thumbnail = meta.thumbnail || track.thumbnail;
+                                                track.uri = meta.uri;
+                                                track.source = "spotify";
+                                                resolvedTracks.push(track);
+                                            }
+                                        } catch (_) { /* skip failed tracks */ }
+                                    }
+
+                                    if (resolvedTracks.length > 0) {
+                                        result = {
+                                            tracks: resolvedTracks,
+                                            playlistName: playlistData.name,
+                                            type: "PLAYLIST",
+                                        };
+                                    }
+                                }
+                            }
                         }
                     } catch (e) {
-                        console.log("YouTube fallback for Spotify also failed:", e.message);
+                        console.log("Spotify API fallback failed:", e.message);
                         result = null;
                     }
                 }
